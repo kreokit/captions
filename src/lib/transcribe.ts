@@ -31,26 +31,33 @@ export const CANCELLED = "cancelled";
 export const MODEL_LABELS: Record<WhisperModel, string> = {
   base: "Base (fast)",
   small: "Small (balanced)",
-  "large-v3-turbo": "Large v3 Turbo (best for Albanian / Macedonian)",
+  "large-v3-turbo": "Large v3 Turbo (most accurate, especially for non-English)",
 };
 
 /** Base keeps development fast; releases default to Small (CLAUDE.md). */
 export const DEFAULT_MODEL: WhisperModel = import.meta.env.DEV ? "base" : "small";
 
-/** "auto" means detect; the others are Whisper language codes. */
+/** "auto" (the default) means detect; the others are Whisper language codes.
+ * English first, then alphabetical. */
 export const LANGUAGES: { code: string; label: string }[] = [
   { code: "auto", label: "Detect automatically" },
-  { code: "sq", label: "Albanian" },
-  { code: "mk", label: "Macedonian" },
   { code: "en", label: "English" },
+  { code: "sq", label: "Albanian" },
+  { code: "ar", label: "Arabic" },
   { code: "bs", label: "Bosnian" },
   { code: "bg", label: "Bulgarian" },
+  { code: "zh", label: "Chinese" },
   { code: "hr", label: "Croatian" },
   { code: "nl", label: "Dutch" },
   { code: "fr", label: "French" },
   { code: "de", label: "German" },
   { code: "el", label: "Greek" },
+  { code: "hi", label: "Hindi" },
+  { code: "id", label: "Indonesian" },
   { code: "it", label: "Italian" },
+  { code: "ja", label: "Japanese" },
+  { code: "ko", label: "Korean" },
+  { code: "mk", label: "Macedonian" },
   { code: "pl", label: "Polish" },
   { code: "pt", label: "Portuguese" },
   { code: "ro", label: "Romanian" },
@@ -59,6 +66,7 @@ export const LANGUAGES: { code: string; label: string }[] = [
   { code: "es", label: "Spanish" },
   { code: "tr", label: "Turkish" },
   { code: "uk", label: "Ukrainian" },
+  { code: "vi", label: "Vietnamese" },
 ];
 
 export function listModels(): Promise<ModelInfo[]> {
@@ -78,6 +86,7 @@ export function transcribe(
   path: string,
   language: string,
   model: WhisperModel,
+  hideNonSpeech: boolean,
   onProgress: (p: TranscribeProgress) => void,
 ): Promise<Transcript> {
   const channel = new Channel<TranscribeProgress>();
@@ -86,6 +95,7 @@ export function transcribe(
     path,
     language: language === "auto" ? null : language,
     model,
+    hideNonSpeech,
     onProgress: channel,
   });
 }

@@ -4,7 +4,8 @@
 #   hello.txt  reference transcript (the exact text spoken)
 #   hello.mp4  640x360 dark background + speech, starting after 1 s of silence
 #
-# Real Albanian and Macedonian clips with hand-checked transcripts are added by hand.
+# English clips are required. Clips in other languages (fixtures/<code>/) are optional and
+# added by hand with hand-checked transcripts.
 set -euo pipefail
 
 cd "$(dirname "$0")/../fixtures/en"

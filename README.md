@@ -6,7 +6,7 @@ Part of [KreoKit](https://github.com/kreokit), free open-source creator tools.
 
 ## Features (v0.1)
 
-- 🎙️ **Auto-transcription** that runs locally with Whisper, in 90+ languages including Albanian, Macedonian and English
+- 🎙️ **Auto-transcription** that runs locally with Whisper: English first, plus 90+ other languages
 - ✏️ **Caption editor** to fix words, split and merge lines, and adjust timing
 - 🎨 **Styles**: font, size, colour, outline, position, and word-by-word highlight for Reels and TikTok
 - 📤 **Export** as an MP4 with burned-in captions, or as `.srt` / `.vtt` files

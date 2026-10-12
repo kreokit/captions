@@ -208,3 +208,14 @@ button.secondary {
   font-variant-numeric: tabular-nums;
   padding-top: 2px;
 }
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+}
+
+.checkbox input {
+  accent-color: var(--accent);
+}

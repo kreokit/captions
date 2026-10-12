@@ -26,6 +26,7 @@ export function TranscribePanel({ videoPath }: { videoPath: string }) {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [model, setModel] = useState<WhisperModel>(DEFAULT_MODEL);
   const [language, setLanguage] = useState("auto");
+  const [hideNonSpeech, setHideNonSpeech] = useState(true);
   const [run, setRun] = useState<RunState>({ status: "idle" });
   // Progress messages can arrive after a run has ended; only the active run may update.
   const runId = useRef(0);
@@ -62,7 +63,7 @@ export function TranscribePanel({ videoPath }: { videoPath: string }) {
         setModels(await listModels());
       }
       update({ status: "running", label: "Starting…", percent: null });
-      const transcript = await transcribe(videoPath, language, model, (p) =>
+      const transcript = await transcribe(videoPath, language, model, hideNonSpeech, (p) =>
         update({ status: "running", ...describeProgress(p) }),
       );
       update({ status: "done", transcript });
@@ -104,6 +105,16 @@ export function TranscribePanel({ videoPath }: { videoPath: string }) {
           </select>
         </label>
       </div>
+
+      <label className="checkbox">
+        <input
+          type="checkbox"
+          checked={hideNonSpeech}
+          onChange={(e) => setHideNonSpeech(e.target.checked)}
+          disabled={running}
+        />
+        Hide sound tags like [MUSIC] or (applause)
+      </label>
 
       {running ? (
         <div className="progress">

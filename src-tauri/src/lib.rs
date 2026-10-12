@@ -78,7 +78,8 @@ async fn download_model(
 }
 
 /// Transcribes the audio of the video at `path`. `language` is a Whisper code
-/// ("sq", "mk", "en", …) or `None` to auto-detect. The model must be downloaded.
+/// ("en", "de", …) or `None` to auto-detect. `hide_non_speech` (default true) drops
+/// sound tags like "[MUSIC]". The model must be downloaded.
 #[tauri::command]
 async fn transcribe(
     app: AppHandle,
@@ -86,6 +87,7 @@ async fn transcribe(
     path: String,
     language: Option<String>,
     model: WhisperModel,
+    hide_non_speech: Option<bool>,
     on_progress: Channel<TranscribeProgress>,
 ) -> Result<Transcript, String> {
     let model_path = model.path_in(&models_dir(&app)?);
@@ -109,6 +111,7 @@ async fn transcribe(
             &model_path,
             &samples,
             language.as_deref(),
+            hide_non_speech.unwrap_or(true),
             cancel,
             move |percent| {
                 let _ = progress.send(TranscribeProgress::Transcribing { percent });

@@ -7,7 +7,7 @@ Read this before every task. It is the source of truth for scope and architectur
 A cross-platform desktop app that auto-captions videos **fully offline**:
 import video → transcribe with Whisper → edit captions → style → export a burned-in MP4 or SRT/VTT.
 
-Target users: creators making Reels/TikTok/Shorts, NGOs, and small businesses. Albanian, Macedonian and English must work well.
+Target users: creators worldwide making Reels/TikTok/Shorts, plus NGOs and small businesses. **English is the primary language and must be excellent.** The other 90+ languages Whisper supports are available too, but secondary.
 
 ## Hard rules
 
@@ -20,7 +20,9 @@ Target users: creators making Reels/TikTok/Shorts, NGOs, and small businesses. A
 
 - **Shell:** Tauri 2 (Rust backend) + React + TypeScript + Vite (frontend), pnpm
 - **Transcription:** `whisper-rs` (bindings to whisper.cpp) with ggml models from Hugging Face, downloaded on first run into the app data dir
-  - Model choices in settings: `base` (fast), `small` (default), `large-v3-turbo` (best for Albanian/Macedonian)
+  - Model choices in settings: `base` (fast; default in dev builds), `small` (default in releases), `large-v3-turbo` (most accurate, especially for non-English)
+  - Language: auto-detect by default
+  - Non-speech tags such as `[MUSIC]` or `(applause)` are hidden from captions by default
   - Enable token-level timestamps to get **word timings** for word-highlight styles
   - GPU: Metal on macOS and CUDA/Vulkan where available, CPU fallback
 - **Media:** FFmpeg as a Tauri **sidecar** binary
@@ -43,7 +45,7 @@ Style   { font_family, font_size, color, highlight_color, outline_color,
 ## Screens (v0.1)
 
 1. **Home:** drop zone for a video, recent projects
-2. **Transcribe:** language (auto / sq / mk / en / …), model picker, progress bar, cancel
+2. **Transcribe:** language (auto-detect by default / en / …), model picker, progress bar, cancel
 3. **Editor:** video player with a live caption overlay rendered in HTML/CSS, matching the ASS output; segment list with editable text and start/end times; split/merge; click a segment to seek
 4. **Style panel:** presets plus manual controls, previewed live
 5. **Export:** MP4 (burned-in) / SRT / VTT, output folder, progress
@@ -59,7 +61,7 @@ Style   { font_family, font_size, color, highlight_color, outline_color,
 
 ## Tests (our oracle)
 
-- `fixtures/` holds 3–5 short clips (Albanian, Macedonian, English) with **hand-checked reference transcripts**
+- `fixtures/` holds short clips with **hand-checked reference transcripts**. English clips are required (`fixtures/en/`; `scripts/make-fixtures.sh` generates a synthetic one); clips in other languages are optional
 - Transcription accuracy: word error rate under a threshold per model, logged rather than strictly enforced at first
 - SRT/VTT: write → parse → compare round-trip; timestamp formatting edge cases (00:00:00,000, over 1 hour)
 - ASS generator: snapshot tests per style mode

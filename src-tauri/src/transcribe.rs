@@ -19,18 +19,20 @@ use crate::models::{CANCELLED, WhisperModel};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Transcript {
-    /// Detected (or requested) language code, e.g. "sq".
+    /// Detected (or requested) language code, e.g. "en".
     pub language: String,
     pub segments: Vec<Segment>,
 }
 
 /// `language`: a Whisper language code, or `None` to auto-detect.
+/// `hide_non_speech`: drop sound tags like "[MUSIC]" (see [`strip_non_speech`]).
 /// `on_progress` receives 0–100. Returns [`CANCELLED`] if `cancel` is set.
 pub fn transcribe(
     model: WhisperModel,
     model_path: &Path,
     samples: &[f32],
     language: Option<&str>,
+    hide_non_speech: bool,
     cancel: Arc<AtomicBool>,
     on_progress: impl FnMut(i32) + 'static,
 ) -> Result<Transcript, String> {
@@ -78,7 +80,7 @@ pub fn transcribe(
     let mut segments = Vec::new();
     let mut prev_end_ms = 0;
     for seg in state.as_iter() {
-        let text = seg
+        let mut text = seg
             .to_bytes()
             .map(|b| String::from_utf8_lossy(b).trim().to_string())
             .unwrap_or_default();
@@ -98,7 +100,21 @@ pub fn transcribe(
                 }
             })
             .collect();
-        let words = align_words(group_tokens(&tokens), &mut prev_end_ms);
+        let mut words = align_words(group_tokens(&tokens), &mut prev_end_ms);
+        if hide_non_speech && !words.is_empty() {
+            let kept = strip_non_speech(words.clone());
+            if kept.is_empty() {
+                continue;
+            }
+            if kept != words {
+                text = kept
+                    .iter()
+                    .map(|w| w.text.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                words = kept;
+            }
+        }
         let (start_ms, end_ms) = match (words.first(), words.last()) {
             (Some(first), Some(last)) => (first.start_ms, last.end_ms),
             _ => (
@@ -217,6 +233,58 @@ fn align_words(drafts: Vec<WordDraft>, prev_end_ms: &mut u64) -> Vec<Word> {
             }
         })
         .collect()
+}
+
+/// Music symbols Whisper uses around sung lyrics.
+const MUSIC_NOTES: &[char] = &['♪', '♫', '♬', '♩'];
+
+/// Longest sound tag we look for, in words ("[upbeat music playing softly]").
+const MAX_TAG_WORDS: usize = 6;
+
+/// Removes the non-speech tags Whisper writes for sounds, e.g. "[MUSIC]", "[Musik]",
+/// "[BLANK_AUDIO]", "(applause)", "*laughs*", and bare "♪" symbols. Lyrics between ♪ marks
+/// are kept. An opening bracket without a nearby closing one is kept as ordinary text.
+fn strip_non_speech(words: Vec<Word>) -> Vec<Word> {
+    let mut kept = Vec::with_capacity(words.len());
+    let mut i = 0;
+    while i < words.len() {
+        let text = words[i].text.as_str();
+        let closer = match text.chars().next() {
+            Some('[') => Some(']'),
+            Some('(') => Some(')'),
+            Some('*') => Some('*'),
+            _ => None,
+        };
+        if let Some(close) = closer {
+            let closes = |w: &Word, skip_first_char: bool| {
+                let t = w
+                    .text
+                    .trim_end_matches(|c: char| c.is_ascii_punctuation() && c != close);
+                let t = if skip_first_char {
+                    t.get(1..).unwrap_or("")
+                } else {
+                    t
+                };
+                t.ends_with(close)
+            };
+            let end = (i..words.len().min(i + MAX_TAG_WORDS)).find(|&j| closes(&words[j], j == i));
+            if let Some(end) = end {
+                i = end + 1;
+                continue;
+            }
+        }
+
+        let trimmed = text.trim_matches(|c| MUSIC_NOTES.contains(&c)).trim();
+        if !trimmed.is_empty() && trimmed.chars().any(char::is_alphanumeric) {
+            let mut word = words[i].clone();
+            if trimmed.len() != text.len() {
+                word.text = trimmed.to_string();
+            }
+            kept.push(word);
+        }
+        i += 1;
+    }
+    kept
 }
 
 #[cfg(test)]
@@ -341,6 +409,62 @@ mod tests {
         );
     }
 
+    fn words(texts: &[&str]) -> Vec<Word> {
+        texts
+            .iter()
+            .enumerate()
+            .map(|(i, t)| word(t, i as u64 * 100, i as u64 * 100 + 90))
+            .collect()
+    }
+
+    fn texts(words: &[Word]) -> Vec<&str> {
+        words.iter().map(|w| w.text.as_str()).collect()
+    }
+
+    #[test]
+    fn strips_sound_tags() {
+        for tag in [
+            "[MUSIC]",
+            "[Musik]",
+            "[BLANK_AUDIO]",
+            "(applause)",
+            "*laughs*",
+            "♪",
+            "[MUSIC].",
+        ] {
+            assert_eq!(strip_non_speech(words(&[tag])), [], "{tag}");
+        }
+    }
+
+    #[test]
+    fn strips_multi_word_tags_and_keeps_speech_around_them() {
+        let kept = strip_non_speech(words(&[
+            "Hi", "[Music", "playing]", "there", "(laughs)", "friends.",
+        ]));
+        assert_eq!(texts(&kept), ["Hi", "there", "friends."]);
+        // Timings of the kept words are untouched.
+        assert_eq!(kept[1], word("there", 300, 390));
+    }
+
+    #[test]
+    fn keeps_lyrics_between_music_notes() {
+        let kept = strip_non_speech(words(&["♪", "Let", "it", "be", "♪"]));
+        assert_eq!(texts(&kept), ["Let", "it", "be"]);
+        assert_eq!(texts(&strip_non_speech(words(&["♪Hello♪"]))), ["Hello"]);
+    }
+
+    #[test]
+    fn strips_tags_split_into_separate_bracket_words() {
+        let kept = strip_non_speech(words(&["[", "MUSIC", "]", "Hello", "("]));
+        assert_eq!(texts(&kept), ["Hello"]);
+    }
+
+    #[test]
+    fn keeps_unclosed_brackets_and_normal_words() {
+        let input = words(&["Use", "(or", "skip", "it", "entirely", "if", "you", "want"]);
+        assert_eq!(strip_non_speech(input.clone()), input);
+    }
+
     #[test]
     fn converts_centiseconds() {
         assert_eq!(centis_to_ms(123), 1_230);
@@ -368,6 +492,7 @@ mod tests {
             &model,
             &samples,
             None,
+            true,
             Arc::new(AtomicBool::new(false)),
             |_| {},
         )

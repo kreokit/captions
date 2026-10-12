@@ -27,11 +27,12 @@ describe("describeProgress", () => {
 });
 
 describe("catalog", () => {
-  it("offers auto-detect first and the core languages", () => {
+  it("offers auto-detect first, then English, then the rest alphabetically", () => {
     const codes = LANGUAGES.map((l) => l.code);
-    expect(codes[0]).toBe("auto");
-    expect(codes).toEqual(expect.arrayContaining(["sq", "mk", "en"]));
+    expect(codes.slice(0, 2)).toEqual(["auto", "en"]);
     expect(new Set(codes).size).toBe(codes.length);
+    const rest = LANGUAGES.slice(2).map((l) => l.label);
+    expect(rest).toEqual([...rest].sort((a, b) => a.localeCompare(b)));
   });
 
   it("labels every model the backend knows", () => {
