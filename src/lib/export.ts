@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import type { Segment, Style } from "./types";
 
 export type SubtitleFormat = "srt" | "vtt" | "ass";
@@ -18,6 +18,26 @@ export function exportSubtitles(
   style: Style,
 ): Promise<string> {
   return invoke<string>("export_subtitles", { path, format, videoPath, segments, style });
+}
+
+/** Renders the captions into a new MP4; `onProgress` receives 0–100. Cancel with
+ * `cancelTranscription()` (it stops any running job). */
+export function exportVideo(
+  videoPath: string,
+  outputPath: string,
+  segments: Segment[],
+  style: Style,
+  onProgress: (percent: number) => void,
+): Promise<string> {
+  const channel = new Channel<number>();
+  channel.onmessage = onProgress;
+  return invoke<string>("export_video", {
+    videoPath,
+    outputPath,
+    segments,
+    style,
+    onProgress: channel,
+  });
 }
 
 /** "/a/b/clip.mov" + "srt" → "clip.srt" */

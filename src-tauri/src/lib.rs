@@ -1,5 +1,6 @@
 mod ass;
 mod audio;
+mod burn;
 mod ffmpeg;
 mod layout;
 mod model;
@@ -173,6 +174,39 @@ async fn export_subtitles(
     .await
 }
 
+/// Renders the captions into a new MP4 at `output_path`. Progress 0–100 goes to
+/// `on_progress`; `cancel_transcription` stops it.
+#[tauri::command]
+async fn export_video(
+    cancel: State<'_, CancelFlag>,
+    video_path: String,
+    output_path: String,
+    segments: Vec<Segment>,
+    style: Style,
+    on_progress: Channel<u32>,
+) -> Result<String, String> {
+    let cancel = cancel.0.clone();
+    cancel.store(false, Ordering::Relaxed);
+    blocking(move || {
+        let video = PathBuf::from(&video_path);
+        let info = probe::probe_video(&video)?;
+        let script = ass::to_ass(&segments, &style, info.width, info.height);
+        burn::burn_in(
+            &video,
+            &PathBuf::from(&output_path),
+            &script,
+            info.duration_ms,
+            &cancel,
+            |p| {
+                let _ = on_progress.send(p);
+            },
+        )?;
+        Ok(output_path)
+    })
+    .await
+}
+
+/// Stops a running transcription, model download or video export.
 #[tauri::command]
 fn cancel_transcription(cancel: State<'_, CancelFlag>) {
     cancel.0.store(true, Ordering::Relaxed);
@@ -191,7 +225,8 @@ pub fn run() {
             cancel_transcription,
             save_project,
             load_project,
-            export_subtitles
+            export_subtitles,
+            export_video
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

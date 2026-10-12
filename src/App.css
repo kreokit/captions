@@ -641,3 +641,37 @@ button.link {
   background: var(--accent);
   color: var(--accent-text);
 }
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 0.45);
+}
+
+.modal {
+  width: min(420px, 90vw);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: 0 16px 48px rgb(0 0 0 / 0.3);
+}
+
+.modal h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.modal progress {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.modal button {
+  align-self: flex-end;
+}
