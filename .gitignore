@@ -33,3 +33,6 @@ ggml-*.bin
 
 # FFmpeg built from source for macOS releases (scripts/build-ffmpeg-macos.sh)
 /target-ffmpeg/
+
+# Python bytecode
+__pycache__/
