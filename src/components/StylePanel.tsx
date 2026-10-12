@@ -118,6 +118,17 @@ const SPOKEN = 2;
 /** Tile previews draw the style at this fraction of its 1080 px reference size. */
 const TILE_SCALE = 0.26;
 
+/** Width of a tile's sample area in the 360 px inspector (3 tiles), in px. */
+const SAMPLE_WIDTH = 96;
+
+/** The style's size scaled for the tile, shrunk so `chars` characters fit the sample
+ * area (about 0.6 em per character, 0.75 em for bold capitals). */
+function tileFontSize(style: Style, chars: number): number {
+  const scaled = Math.min(style.font_size * TILE_SCALE, style.mode === "one_word" ? 40 : 30);
+  const perChar = style.uppercase && style.bold ? 0.75 : 0.6;
+  return Math.min(scaled, SAMPLE_WIDTH / (Math.max(chars, 1) * perChar));
+}
+
 function PresetTile({ preset, selected, onSelect }: { preset: Preset; selected: boolean; onSelect: () => void }) {
   const s = preset.style;
   const words = (s.mode === "one_word" ? [SAMPLE[SPOKEN]] : SAMPLE).map((w) => (s.uppercase ? w.toUpperCase() : w));
@@ -135,8 +146,8 @@ function PresetTile({ preset, selected, onSelect }: { preset: Preset; selected: 
           style={{
             fontFamily: `"${s.font_family}"`,
             fontWeight: s.bold ? 700 : 400,
-            // Scaled from the style, but never wider than the tile (~0.66 em per character).
-            fontSize: `min(${Math.min(s.font_size * TILE_SCALE, 30)}px, ${88 / (words.join(" ").length * 0.66)}cqw)`,
+            // Scaled from the style, but never wider than the tile's sample area.
+            fontSize: tileFontSize(s, words.join(" ").length),
             color: s.color,
             textShadow: outlineShadow(Math.max(s.outline_width * TILE_SCALE, s.outline_width ? 1 : 0), s.outline_color),
           }}

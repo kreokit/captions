@@ -303,7 +303,7 @@ mod tests {
         let ass = to_ass(&[], &Style::default(), 1080, 1920);
         assert!(ass.contains("PlayResX: 608\nPlayResY: 1080\nWrapStyle: 2\n"));
         assert!(ass.contains(
-            "Style: Default,Arial,72,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,6,0,2,30,30,86,1\n"
+            "Style: Default,Montserrat,72,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,6,0,2,30,30,86,1\n"
         ));
         let wide = to_ass(
             &[],

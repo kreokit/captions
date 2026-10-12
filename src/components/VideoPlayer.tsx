@@ -170,6 +170,7 @@ function PlayerControls({ playing, onTogglePlay }: { playing: boolean; onToggleP
 }
 
 function CaptionOverlay({ scale }: { scale: number }) {
+  useFontsLoaded();
   const segments = useEditor((s) => s.project?.segments ?? NO_SEGMENTS);
   const style = useEditor((s) => s.project?.style);
   const currentMs = useEditor((s) => s.currentMs);
@@ -207,17 +208,35 @@ const NO_SEGMENTS: Segment[] = [];
  */
 const sizeRatios = new Map<string, number>();
 function emPerFontSize(family: string, bold: boolean): number {
+  const font = `${bold ? 700 : 400} 100px "${family}"`;
   const key = `${family}|${bold}`;
   let ratio = sizeRatios.get(key);
   if (ratio === undefined) {
+    // Bundled fonts load on first use; measuring before that would measure (and cache)
+    // the fallback font. Until then use a typical ratio; useFontsLoaded re-renders.
+    if (!document.fonts.check(font)) {
+      void document.fonts.load(font);
+      return 1 / 1.15;
+    }
     const ctx = document.createElement("canvas").getContext("2d");
-    if (ctx) ctx.font = `${bold ? 700 : 400} 100px "${family}"`;
+    if (ctx) ctx.font = font;
     const m = ctx?.measureText("H");
     const height = m ? m.fontBoundingBoxAscent + m.fontBoundingBoxDescent : 0;
     ratio = height > 0 ? 100 / height : 1 / 1.15;
     sizeRatios.set(key, ratio);
   }
   return ratio;
+}
+
+/** Re-renders when web fonts finish loading (so caption metrics get re-measured). */
+function useFontsLoaded(): number {
+  const [generation, setGeneration] = useState(0);
+  useEffect(() => {
+    const bump = () => setGeneration((g) => g + 1);
+    document.fonts.addEventListener("loadingdone", bump);
+    return () => document.fonts.removeEventListener("loadingdone", bump);
+  }, []);
+  return generation;
 }
 
 /** Sizes and positions from the same reference values as the ASS export (ass.rs). */

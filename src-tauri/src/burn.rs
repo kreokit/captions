@@ -35,6 +35,7 @@ pub fn burn_in(
     video: &Path,
     output: &Path,
     ass: &str,
+    fonts_dir: Option<&Path>,
     duration_ms: u64,
     cancel: &AtomicBool,
     mut on_progress: impl FnMut(u32),
@@ -43,33 +44,61 @@ pub fn burn_in(
     let encoder = pick_encoder(&ffmpeg)?;
     let bitrate = target_bitrate(video, duration_ms);
 
-    // FFmpeg's filter syntax needs escaping for ':' and '\' (Windows paths); running
-    // in the temp dir and naming the file plainly avoids that entirely.
-    let work_dir = std::env::temp_dir();
+    // FFmpeg's filter syntax needs escaping for ':' and '\\' (Windows paths). Each export
+    // gets its own temp folder holding the script and a copy of the bundled caption fonts,
+    // and FFmpeg runs inside it, so the filter only names plain relative paths.
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_nanos());
-    let ass_name = format!("kreokit-{}-{nanos}.ass", std::process::id());
-    let ass_path = work_dir.join(&ass_name);
-    std::fs::write(&ass_path, ass).map_err(|e| format!("cannot write captions: {e}"))?;
-
-    let result = run_ffmpeg(
-        &ffmpeg,
-        &work_dir,
-        video,
-        output,
-        &ass_name,
-        encoder,
-        bitrate,
-        duration_ms,
-        cancel,
-        &mut on_progress,
-    );
-    let _ = std::fs::remove_file(&ass_path);
+    let work_dir =
+        std::env::temp_dir().join(format!("kreokit-export-{}-{nanos}", std::process::id()));
+    let result = prepare_work_dir(&work_dir, ass, fonts_dir).and_then(|filter| {
+        run_ffmpeg(
+            &ffmpeg,
+            &work_dir,
+            video,
+            output,
+            &filter,
+            encoder,
+            bitrate,
+            duration_ms,
+            cancel,
+            &mut on_progress,
+        )
+    });
+    let _ = std::fs::remove_dir_all(&work_dir);
     if result.is_err() {
         let _ = std::fs::remove_file(output);
     }
     result
+}
+
+/// Writes `captions.ass` (and copies the `.ttf`/`.otf` files from `fonts_dir` into
+/// `fonts/`) under `work_dir`; returns the matching `ass` filter.
+fn prepare_work_dir(
+    work_dir: &Path,
+    ass: &str,
+    fonts_dir: Option<&Path>,
+) -> Result<String, String> {
+    let fail = |e: std::io::Error| format!("cannot prepare the export: {e}");
+    std::fs::create_dir_all(work_dir).map_err(fail)?;
+    std::fs::write(work_dir.join("captions.ass"), ass).map_err(fail)?;
+    let Some(fonts_dir) = fonts_dir else {
+        return Ok("ass=filename=captions.ass".into());
+    };
+    let fonts = work_dir.join("fonts");
+    std::fs::create_dir_all(&fonts).map_err(fail)?;
+    for entry in std::fs::read_dir(fonts_dir).map_err(fail)?.flatten() {
+        let path = entry.path();
+        let is_font = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| matches!(e.to_lowercase().as_str(), "ttf" | "otf"));
+        if is_font {
+            std::fs::copy(&path, fonts.join(entry.file_name())).map_err(fail)?;
+        }
+    }
+    Ok("ass=filename=captions.ass:fontsdir=fonts".into())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -78,7 +107,7 @@ fn run_ffmpeg(
     work_dir: &Path,
     video: &Path,
     output: &Path,
-    ass_name: &str,
+    filter: &str,
     encoder: &str,
     bitrate: u64,
     duration_ms: u64,
@@ -98,7 +127,7 @@ fn run_ffmpeg(
             "-i",
         ])
         .arg(absolute(video))
-        .args(["-vf", &format!("ass=filename={ass_name}")])
+        .args(["-vf", filter])
         .args(["-map", "0:v:0", "-map", "0:a:0?"])
         .args([
             "-c:v",
@@ -233,6 +262,23 @@ mod tests {
     }
 
     #[test]
+    fn prepares_script_and_fonts() {
+        let work = std::env::temp_dir().join("kreokit-prepare-test");
+        let _ = std::fs::remove_dir_all(&work);
+        let fonts = Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/fonts");
+        let filter = prepare_work_dir(&work, "[Script Info]", Some(&fonts)).unwrap();
+        assert_eq!(filter, "ass=filename=captions.ass:fontsdir=fonts");
+        assert!(work.join("fonts/Montserrat-Bold.ttf").is_file());
+        assert!(!work.join("fonts/OFL-Montserrat.txt").exists());
+        let _ = std::fs::remove_dir_all(&work);
+        assert_eq!(
+            prepare_work_dir(&work, "x", None).unwrap(),
+            "ass=filename=captions.ass"
+        );
+        let _ = std::fs::remove_dir_all(&work);
+    }
+
+    #[test]
     fn bitrate_stays_in_range() {
         let tiny = std::env::temp_dir().join("kreokit-bitrate-test");
         std::fs::write(&tiny, [0u8; 1000]).unwrap();
@@ -276,10 +322,12 @@ mod tests {
 
         let output = std::env::temp_dir().join("kreokit-burn-test.mp4");
         let mut progress = Vec::new();
+        let fonts = Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/fonts");
         burn_in(
             &fixture,
             &output,
             &ass,
+            Some(&fonts),
             input.duration_ms,
             &AtomicBool::new(false),
             |p| progress.push(p),
@@ -317,9 +365,9 @@ mod tests {
             "lime pixels at 1.2 s: {lime}; frame saved to {}",
             png.display()
         );
-        // "WELCOME" covers ~500 px at 640x360; compression shifts some edge pixels out of
-        // the colour range, so allow for that.
-        assert!(lime > 250, "highlighted word not visible");
+        // "WELCOME" in Montserrat Bold covers ~250-300 px at 640x360, and compression
+        // shifts some edge pixels out of the colour range, so allow for that.
+        assert!(lime > 150, "highlighted word not visible");
         let _ = std::fs::remove_file(&output);
     }
 }

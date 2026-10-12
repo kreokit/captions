@@ -4,8 +4,8 @@
     "name": "Clean subtitle",
     "description": "Classic two-line subtitles with a thin outline.",
     "style": {
-      "font_family": "Arial",
-      "font_size": 54,
+      "font_family": "Inter",
+      "font_size": 52,
       "color": "#FFFFFF",
       "highlight_color": "#FFFFFF",
       "outline_color": "#000000",
@@ -24,7 +24,7 @@
     "name": "Bold highlight",
     "description": "Big uppercase captions; the spoken word lights up.",
     "style": {
-      "font_family": "Arial",
+      "font_family": "Montserrat",
       "font_size": 72,
       "color": "#FFFFFF",
       "highlight_color": "#C8F135",
@@ -44,8 +44,8 @@
     "name": "One-word pop",
     "description": "One large word at a time in the middle, popping in.",
     "style": {
-      "font_family": "Arial",
-      "font_size": 120,
+      "font_family": "Bebas Neue",
+      "font_size": 150,
       "color": "#FFFFFF",
       "highlight_color": "#FFFFFF",
       "outline_color": "#000000",
@@ -54,7 +54,7 @@
       "max_chars_per_line": 16,
       "max_lines": 1,
       "mode": "one_word",
-      "bold": true,
+      "bold": false,
       "uppercase": true,
       "animation": "pop"
     }

@@ -2,6 +2,9 @@
 
 /* Caption overlay: positioned like the ASS export (see overlayStyle in VideoPlayer). */
 .overlay {
+  /* Caption fonts render with their default glyphs, as libass does; the UI's Inter
+     stylistic sets (base.css) must not leak in. */
+  font-feature-settings: normal;
   position: absolute;
   left: 50%;
   transform: translateX(-50%);

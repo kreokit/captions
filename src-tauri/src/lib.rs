@@ -53,6 +53,20 @@ fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
 /// Video files the app opens (also used to vet dropped files).
 const VIDEO_EXTENSIONS: &[&str] = &["mp4", "mov", "m4v", "mkv", "webm", "avi"];
 
+/// The bundled caption fonts (tauri.conf.json `bundle.resources`); in debug builds also
+/// the source folder, in case the resources haven't been copied yet.
+fn caption_fonts_dir(app: &AppHandle) -> Option<PathBuf> {
+    let bundled = app
+        .path()
+        .resolve("fonts", tauri::path::BaseDirectory::Resource)
+        .ok()
+        .filter(|p| p.is_dir());
+    bundled.or_else(|| {
+        let source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/fonts");
+        (cfg!(debug_assertions) && source.is_dir()).then_some(source)
+    })
+}
+
 fn models_dir(app: &AppHandle) -> Result<PathBuf, String> {
     app.path()
         .app_data_dir()
@@ -202,6 +216,7 @@ async fn export_subtitles(
 /// `on_progress`; `cancel_transcription` stops it.
 #[tauri::command]
 async fn export_video(
+    app: AppHandle,
     cancel: State<'_, CancelFlag>,
     video_path: String,
     output_path: String,
@@ -211,6 +226,7 @@ async fn export_video(
 ) -> Result<String, String> {
     let cancel = cancel.0.clone();
     cancel.store(false, Ordering::Relaxed);
+    let fonts = caption_fonts_dir(&app);
     blocking(move || {
         let video = PathBuf::from(&video_path);
         let info = probe::probe_video(&video)?;
@@ -219,6 +235,7 @@ async fn export_video(
             &video,
             &PathBuf::from(&output_path),
             &script,
+            fonts.as_deref(),
             info.duration_ms,
             &cancel,
             |p| {

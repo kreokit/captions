@@ -77,7 +77,10 @@ export function Select<T extends string>({
           }
         }}
       >
-        <span className="ui-select-value" style={{ fontFamily: current?.fontFamily }}>
+        <span
+          className="ui-select-value"
+          style={current?.fontFamily ? { fontFamily: current.fontFamily, fontFeatureSettings: "normal" } : undefined}
+        >
           {current?.label}
         </span>
         <ChevronDown size={14} strokeWidth={ICON_STROKE} aria-hidden />
@@ -128,7 +131,10 @@ export function Select<T extends string>({
               <span className="ui-option-check">
                 {o.value === value && <Check size={14} strokeWidth={2} aria-hidden />}
               </span>
-              <span className="ui-option-label" style={{ fontFamily: o.fontFamily }}>
+              <span
+                className="ui-option-label"
+                style={o.fontFamily ? { fontFamily: o.fontFamily, fontFeatureSettings: "normal" } : undefined}
+              >
                 {o.label}
               </span>
               {o.hint && <span className="ui-option-hint">{o.hint}</span>}

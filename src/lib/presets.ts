@@ -23,5 +23,11 @@ export function matchingPreset(style: Style): Preset | undefined {
   );
 }
 
-/** Fonts available on both macOS and Windows, so exports render with the chosen font. */
-export const FONTS = ["Arial", "Helvetica", "Verdana", "Georgia", "Trebuchet MS", "Impact", "Courier New"];
+/** Free fonts shipped with the app (src-tauri/resources/fonts): preview and export use
+ * the same files. */
+export const BUNDLED_FONTS = ["Inter", "Montserrat", "Poppins", "Bebas Neue"];
+
+/** System fonts present on macOS and Windows. */
+export const SYSTEM_FONTS = ["Arial", "Helvetica", "Verdana", "Georgia", "Trebuchet MS", "Impact", "Courier New"];
+
+export const FONTS = [...BUNDLED_FONTS, ...SYSTEM_FONTS];

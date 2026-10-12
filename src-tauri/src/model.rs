@@ -67,7 +67,7 @@ pub struct Style {
 impl Default for Style {
     fn default() -> Self {
         Self {
-            font_family: "Arial".into(),
+            font_family: "Montserrat".into(),
             font_size: 72,
             color: "#FFFFFF".into(),
             highlight_color: "#C8F135".into(),
