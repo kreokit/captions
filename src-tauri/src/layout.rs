@@ -21,11 +21,12 @@ pub struct Layout {
     pub pages: Vec<Page>,
 }
 
-/// Greedy line breaking: a word joins the current line if the line (words plus single
-/// spaces) stays within `max_chars` characters; a longer word gets a line of its own.
-/// Lines are grouped into pages of `max_lines`. The first page starts with the segment,
-/// later pages with their first word, and each page lasts until the next one starts (the
-/// last until the segment ends).
+/// Line breaking: words fill a line while it stays within `max_chars` characters (words
+/// plus single spaces); a longer word gets a line of its own. When the next word doesn't
+/// fit, the break may move back a few words to a better spot (see [`choose_break`]).
+/// Lines are grouped into pages of `max_lines`, so the same rules decide where captions
+/// end. The first page starts with the segment, later pages with their first word, and
+/// each page lasts until the next one starts (the last until the segment ends).
 pub fn layout(segment: &Segment, max_chars: u32, max_lines: u32) -> Layout {
     let words = if !segment.words.is_empty() {
         segment.words.clone()
@@ -41,20 +42,20 @@ pub fn layout(segment: &Segment, max_chars: u32, max_lines: u32) -> Layout {
     let max_chars = max_chars.max(1) as usize;
     let max_lines = max_lines.max(1) as usize;
 
+    let texts: Vec<&str> = words.iter().map(|w| w.text.as_str()).collect();
     let mut lines: Vec<Vec<usize>> = Vec::new();
-    let mut line_len = 0;
-    for (i, word) in words.iter().enumerate() {
-        let len = word.text.chars().count();
-        match lines.last_mut() {
-            Some(line) if line_len + 1 + len <= max_chars => {
-                line.push(i);
-                line_len += 1 + len;
-            }
-            _ => {
-                lines.push(vec![i]);
-                line_len = len;
-            }
+    let mut current: Vec<usize> = Vec::new();
+    for i in 0..words.len() {
+        if current.is_empty() || line_len(&texts, &current) + 1 + char_len(texts[i]) <= max_chars {
+            current.push(i);
+            continue;
         }
+        let moved = choose_break(&texts, &current, i, max_chars);
+        let next: Vec<usize> = current.drain(current.len() - moved..).chain([i]).collect();
+        lines.push(std::mem::replace(&mut current, next));
+    }
+    if !current.is_empty() {
+        lines.push(current);
     }
 
     let chunks: Vec<Vec<Vec<usize>>> = lines.chunks(max_lines).map(<[_]>::to_vec).collect();
@@ -79,6 +80,72 @@ pub fn layout(segment: &Segment, max_chars: u32, max_lines: u32) -> Layout {
         })
         .collect();
     Layout { words, pages }
+}
+
+/// Function words a line or caption shouldn't end on.
+const SHORT_WORDS: &[&str] = &[
+    "a", "an", "the", "to", "of", "and", "or", "but", "in", "on", "at", "for", "with", "from",
+    "by", "as", "i", "my", "your",
+];
+
+/// How many of `line`'s last words to move to the next line (with word `next`) when
+/// `next` doesn't fit. Each possible break, after word w, scores:
+///   +3 if w ends a sentence (. ! ? …), +2 if it ends a clause (, ; :)
+///   -3 if w starts a new sentence (dangling "RICH. I / DON'T")
+///   -2 if w is a short function word ("the", "to", …)
+/// Twice the score minus the words moved wins; ties keep more on the line. A break may not
+/// leave the line under half of `max_chars`, and the moved words plus `next` must fit.
+fn choose_break(texts: &[&str], line: &[usize], next: usize, max_chars: usize) -> usize {
+    let mut best = (i32::MIN, 0);
+    for moved in 0..line.len() {
+        let keep = &line[..line.len() - moved];
+        if moved > 0 {
+            let moved_len = line_len(texts, &line[keep.len()..]) + 1 + char_len(texts[next]);
+            if moved_len > max_chars || line_len(texts, keep) * 2 < max_chars {
+                break;
+            }
+        }
+        let last = texts[*keep.last().unwrap()];
+        let mut score = 0;
+        if ends_sentence(last) {
+            score += 3;
+        } else if ends_clause(last) {
+            score += 2;
+        }
+        if keep.len() >= 2 && ends_sentence(texts[keep[keep.len() - 2]]) {
+            score -= 3;
+        }
+        if SHORT_WORDS.contains(&last.to_lowercase().as_str()) {
+            score -= 2;
+        }
+        let total = score * 2 - moved as i32;
+        if total > best.0 {
+            best = (total, moved);
+        }
+    }
+    best.1
+}
+
+/// The word without closing quotes or brackets after its punctuation.
+fn core(word: &str) -> &str {
+    word.trim_end_matches(['"', '\'', '”', '’', ')', ']', '»'])
+}
+
+fn ends_sentence(word: &str) -> bool {
+    core(word).ends_with(['.', '!', '?', '…'])
+}
+
+fn ends_clause(word: &str) -> bool {
+    core(word).ends_with([',', ';', ':'])
+}
+
+fn char_len(text: &str) -> usize {
+    text.chars().count()
+}
+
+/// Characters of the words joined by single spaces.
+fn line_len(texts: &[&str], line: &[usize]) -> usize {
+    line.iter().map(|&i| char_len(texts[i])).sum::<usize>() + line.len().saturating_sub(1)
 }
 
 #[cfg(test)]
