@@ -65,9 +65,11 @@ meson_build freetype-2.14.3 \
 meson_build fribidi-1.0.17 -Ddocs=false -Dbin=false -Dtests=false
 meson_build harfbuzz-14.6.0 \
   -Dfreetype=enabled -Dglib=disabled -Dgobject=disabled -Dcairo=disabled -Dicu=disabled \
-  -Dtests=disabled -Ddocs=disabled -Dutilities=disabled -Dintrospection=disabled
+  -Dtests=disabled -Ddocs=disabled -Dutilities=disabled -Dintrospection=disabled \
+  -Dchafa=disabled -Dpng=disabled -Dzlib=disabled -Dgraphite2=disabled
 meson_build libass-0.17.5 \
-  -Dfontconfig=disabled -Dcoretext=enabled -Drequire-system-font-provider=true -Dtest=disabled
+  -Dfontconfig=disabled -Dcoretext=enabled -Drequire-system-font-provider=true -Dtest=disabled \
+  -Dlibunibreak=disabled
 
 ASM=()
 [[ "$ARCH" == "arm64" ]] || ASM=(--x86asmexe=nasm)
@@ -86,7 +88,8 @@ ASM=()
   make -j"$(sysctl -n hw.ncpu)" &&
   make install)
 
-cp "$WORK/ffmpeg-9.0.2/LICENSE.md" "$OUT/LICENSE.md"
+# Licence summary plus the full LGPL 2.1 text, shipped with the app.
+cat "$WORK/ffmpeg-9.0.2/LICENSE.md" "$WORK/ffmpeg-9.0.2/COPYING.LGPLv2.1" > "$OUT/LICENSE.md"
 
 # The executables must only depend on system libraries and frameworks.
 for tool in ffmpeg ffprobe; do

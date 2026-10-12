@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Puts LGPL ffmpeg + ffprobe for one target into src-tauri/binaries/ as Tauri sidecars.
 
-    python3 scripts/fetch_ffmpeg.py <rust-target-triple>
+    python3 scripts/fetch_ffmpeg.py <rust-target-triple> [--reuse]
+
+--reuse (macOS): use an existing build in target-ffmpeg/<arch> (e.g. restored from the CI
+cache) instead of building again.
 
 Windows and Linux: downloads a pinned BtbN FFmpeg-Builds *LGPL* static build, checks its
 SHA-256 and extracts the two executables. macOS: builds FFmpeg from source with
@@ -86,26 +89,30 @@ def fetch_btbn(triple: str) -> None:
     (BINARIES / "FFMPEG-LICENSE.txt").write_bytes(found["LICENSE"])
 
 
-def build_macos(triple: str) -> None:
+def build_macos(triple: str, reuse: bool) -> None:
     arch = MACOS[triple]
     if platform.system() != "Darwin":
         sys.exit("macOS FFmpeg is built from source and needs a Mac")
     out = ROOT / "target-ffmpeg" / arch
-    subprocess.run([str(ROOT / "scripts" / "build-ffmpeg-macos.sh"), arch, str(out)], check=True)
+    if reuse and (out / "bin" / "ffmpeg").is_file() and (out / "bin" / "ffprobe").is_file():
+        print(f"reusing {out.relative_to(ROOT)}")
+    else:
+        subprocess.run([str(ROOT / "scripts" / "build-ffmpeg-macos.sh"), arch, str(out)], check=True)
     for tool in ("ffmpeg", "ffprobe"):
         install(tool, (out / "bin" / tool).read_bytes(), triple, "")
     shutil.copy(out / "LICENSE.md", BINARIES / "FFMPEG-LICENSE.txt")
 
 
 def main() -> None:
-    if len(sys.argv) != 2:
+    args = [a for a in sys.argv[1:] if a != "--reuse"]
+    if len(args) != 1:
         sys.exit(__doc__)
-    triple = sys.argv[1]
+    triple = args[0]
     BINARIES.mkdir(parents=True, exist_ok=True)
     if triple in BTBN:
         fetch_btbn(triple)
     elif triple in MACOS:
-        build_macos(triple)
+        build_macos(triple, "--reuse" in sys.argv)
     else:
         sys.exit(f"no FFmpeg source for {triple}; known: {', '.join([*BTBN, *MACOS])}")
 
