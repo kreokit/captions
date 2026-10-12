@@ -1,37 +1,14 @@
+/* Legacy names used by the screens not yet redesigned; they map to the design tokens
+   (src/styles/tokens.css) and go away as each screen is rebuilt. */
 :root {
-  --bg: #f6f6f7;
-  --surface: #ffffff;
-  --text: #16161a;
-  --muted: #6b6b76;
-  --border: #e2e2e7;
-  --accent: #5b4cf0;
-  --accent-text: #ffffff;
-  --error: #c62828;
-
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
-  color: var(--text);
-  background-color: var(--bg);
-  -webkit-font-smoothing: antialiased;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #17171b;
-    --surface: #222228;
-    --text: #ededf0;
-    --muted: #9a9aa6;
-    --border: #34343c;
-    --accent: #8b7ff7;
-    --accent-text: #0e0e12;
-    --error: #ff8a80;
-  }
-}
-
-body {
-  margin: 0;
-  background: var(--bg);
+  --bg: var(--color-bg);
+  --surface: var(--color-surface-1);
+  --text: var(--color-text);
+  --muted: var(--color-text-2);
+  --border: var(--color-border);
+  --accent: var(--color-accent);
+  --accent-text: var(--color-on-accent);
+  --error: var(--color-danger);
 }
 
 .home {
