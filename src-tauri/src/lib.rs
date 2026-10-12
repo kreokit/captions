@@ -1,3 +1,4 @@
+mod ass;
 mod audio;
 mod ffmpeg;
 mod layout;
@@ -146,16 +147,26 @@ async fn load_project(app: AppHandle, path: String) -> Result<Project, String> {
     Ok(project)
 }
 
-/// Writes the captions as an SRT or WebVTT file; returns the path written.
+/// Writes the captions as SRT, WebVTT or styled ASS; returns the path written.
+/// ASS needs the video's size, read from `video_path`.
 #[tauri::command]
 async fn export_subtitles(
     path: String,
     format: subtitles::SubtitleFormat,
+    video_path: String,
     segments: Vec<Segment>,
     style: Style,
 ) -> Result<String, String> {
+    use subtitles::SubtitleFormat::*;
     blocking(move || {
-        let text = subtitles::write(format, &subtitles::cues(&segments, &style));
+        let text = match format {
+            Srt => subtitles::to_srt(&subtitles::cues(&segments, &style)),
+            Vtt => subtitles::to_vtt(&subtitles::cues(&segments, &style)),
+            Ass => {
+                let video = probe::probe_video(&PathBuf::from(&video_path))?;
+                ass::to_ass(&segments, &style, video.width, video.height)
+            }
+        };
         std::fs::write(&path, text).map_err(|e| format!("cannot write {path}: {e}"))?;
         Ok(path)
     })

@@ -20,7 +20,13 @@ export function ExportMenu({ onStatus }: { onStatus: (message: string) => void }
     if (!path) return;
     setBusy(true);
     try {
-      const written = await exportSubtitles(path, format, project.segments, project.style);
+      const written = await exportSubtitles(
+        path,
+        format,
+        project.video_path,
+        project.segments,
+        project.style,
+      );
       onStatus(`Exported ${fileName(written)}`);
     } catch (e) {
       onStatus(String(e));

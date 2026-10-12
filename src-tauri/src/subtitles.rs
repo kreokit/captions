@@ -21,6 +21,8 @@ pub struct Cue {
 pub enum SubtitleFormat {
     Srt,
     Vtt,
+    /// Styled; written by ass.rs, not from cues.
+    Ass,
 }
 
 /// One cue per layout page; pages with no duration are skipped.
@@ -51,13 +53,6 @@ pub fn cues(segments: &[Segment], style: &Style) -> Vec<Cue> {
                 .collect::<Vec<_>>()
         })
         .collect()
-}
-
-pub fn write(format: SubtitleFormat, cues: &[Cue]) -> String {
-    match format {
-        SubtitleFormat::Srt => to_srt(cues),
-        SubtitleFormat::Vtt => to_vtt(cues),
-    }
 }
 
 pub fn to_srt(cues: &[Cue]) -> String {
