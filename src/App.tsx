@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
   VIDEO_EXTENSIONS,
@@ -12,6 +13,7 @@ import { PROJECT_EXTENSION, loadProject } from "./lib/project";
 import { Editor } from "./components/Editor";
 import { TranscribePanel } from "./components/TranscribePanel";
 import { useEditor } from "./store/editor";
+import { ToastRegion } from "./ui";
 import "./App.css";
 
 type ProbeState =
@@ -22,7 +24,21 @@ type ProbeState =
 
 function App() {
   const hasProject = useEditor((s) => s.project !== null);
-  return hasProject ? <Editor /> : <Home />;
+
+  // Development aid: KREOKIT_DEV_OPEN=/path/to/project.kreocap opens it at startup.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    invoke<string | null>("dev_startup_project").then(async (path) => {
+      if (path) useEditor.getState().open(await loadProject(path), path);
+    });
+  }, []);
+
+  return (
+    <>
+      {hasProject ? <Editor /> : <Home />}
+      <ToastRegion />
+    </>
+  );
 }
 
 function Home() {

@@ -13,10 +13,10 @@
     "windows": [
       {
         "title": "KreoKit Captions",
-        "width": 1200,
-        "height": 780,
-        "minWidth": 720,
-        "minHeight": 520
+        "width": 1280,
+        "height": 800,
+        "minWidth": 1024,
+        "minHeight": 640
       }
     ],
     "security": {

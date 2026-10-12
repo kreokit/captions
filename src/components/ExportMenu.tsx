@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
+import { ChevronDown, FileText, Film } from "lucide-react";
 import {
   SUBTITLE_FORMATS,
   SubtitleFormat,
@@ -10,15 +11,15 @@ import {
 import { CANCELLED, cancelTranscription } from "../lib/transcribe";
 import { fileName } from "../lib/video";
 import { useEditor } from "../store/editor";
+import { Button, Dialog, Menu, MenuEntry, ProgressBar, toast } from "../ui";
 
-export function ExportMenu({ onStatus }: { onStatus: (message: string) => void }) {
-  const menu = useRef<HTMLDetailsElement>(null);
+/** The editor's one primary action: Export ▾ (MP4 with captions, or subtitle files). */
+export function ExportMenu() {
   const [busy, setBusy] = useState(false);
   /** Burn-in progress 0–100 while a video export runs. */
   const [videoProgress, setVideoProgress] = useState<number | null>(null);
 
-  async function exportAs(format: SubtitleFormat) {
-    menu.current?.removeAttribute("open");
+  const exportAs = async (format: SubtitleFormat) => {
     const { project } = useEditor.getState();
     if (!project) return;
     const { label, extension } = SUBTITLE_FORMATS[format];
@@ -29,23 +30,16 @@ export function ExportMenu({ onStatus }: { onStatus: (message: string) => void }
     if (!path) return;
     setBusy(true);
     try {
-      const written = await exportSubtitles(
-        path,
-        format,
-        project.video_path,
-        project.segments,
-        project.style,
-      );
-      onStatus(`Exported ${fileName(written)}`);
+      const written = await exportSubtitles(path, format, project.video_path, project.segments, project.style);
+      toast(`Exported ${fileName(written)}`, "success");
     } catch (e) {
-      onStatus(String(e));
+      toast(String(e), "error");
     } finally {
       setBusy(false);
     }
-  }
+  };
 
-  async function exportMp4() {
-    menu.current?.removeAttribute("open");
+  const exportMp4 = useCallback(async () => {
     const { project } = useEditor.getState();
     if (!project) return;
     const path = await save({
@@ -56,50 +50,58 @@ export function ExportMenu({ onStatus }: { onStatus: (message: string) => void }
     setBusy(true);
     setVideoProgress(0);
     try {
-      const written = await exportVideo(
-        project.video_path,
-        path,
-        project.segments,
-        project.style,
-        setVideoProgress,
-      );
-      onStatus(`Exported ${fileName(written)}`);
+      const written = await exportVideo(project.video_path, path, project.segments, project.style, setVideoProgress);
+      toast(`Exported ${fileName(written)}`, "success");
     } catch (e) {
-      onStatus(String(e) === CANCELLED ? "Export cancelled" : String(e));
+      toast(String(e) === CANCELLED ? "Export cancelled" : String(e), String(e) === CANCELLED ? "info" : "error");
     } finally {
       setBusy(false);
       setVideoProgress(null);
     }
-  }
+  }, []);
+
+  // ⌘E exports the video.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "e" && !busy) {
+        e.preventDefault();
+        void exportMp4();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [busy, exportMp4]);
+
+  const items: MenuEntry[] = [
+    { label: "Video with captions (.mp4)", icon: Film, shortcut: "⌘E", onSelect: exportMp4 },
+    "separator",
+    ...(Object.keys(SUBTITLE_FORMATS) as SubtitleFormat[]).map((format) => ({
+      label: SUBTITLE_FORMATS[format].label,
+      icon: FileText,
+      onSelect: () => void exportAs(format),
+    })),
+  ];
 
   return (
     <>
-      <details className="menu" ref={menu}>
-        <summary className="button secondary" aria-disabled={busy}>
-          Export ▾
-        </summary>
-        <div className="menu-items">
-          <button type="button" onClick={exportMp4}>
-            Video with captions (.mp4)
-          </button>
-          {(Object.keys(SUBTITLE_FORMATS) as SubtitleFormat[]).map((format) => (
-            <button key={format} type="button" onClick={() => exportAs(format)}>
-              {SUBTITLE_FORMATS[format].label}
-            </button>
-          ))}
-        </div>
-      </details>
+      <Menu label="Export" variant="primary" trailingIcon={ChevronDown} align="end" items={items} />
       {videoProgress !== null && (
-        <div className="modal-backdrop">
-          <div className="modal" role="dialog" aria-modal="true" aria-label="Exporting video">
-            <h2>Exporting video…</h2>
-            <progress max={100} value={videoProgress} />
-            <p className="hint">{videoProgress}%</p>
-            <button type="button" className="secondary" onClick={() => cancelTranscription()}>
+        <Dialog
+          title="Exporting video"
+          dismissible={false}
+          onClose={() => {}}
+          width={420}
+          footer={
+            <Button variant="secondary" onClick={() => cancelTranscription()}>
               Cancel
-            </button>
+            </Button>
+          }
+        >
+          <div className="export-progress">
+            <ProgressBar value={videoProgress} label="Export progress" />
+            <span className="tabular">{videoProgress}%</span>
           </div>
-        </div>
+        </Dialog>
       )}
     </>
   );

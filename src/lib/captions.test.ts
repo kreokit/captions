@@ -6,7 +6,9 @@ import {
   findSegmentAt,
   findWordAt,
   mergeWithNext,
+  nextCaptionStart,
   parseTime,
+  previousCaptionStart,
   splitSegment,
   wordIndexAtCaret,
 } from "./captions";
@@ -147,5 +149,20 @@ describe("editTimes", () => {
     expect(editTimes(segments, 1, 2600, 3960)).toMatch(/previous/);
     expect(editTimes(segments, 0, 1040, 3000)).toMatch(/next/);
     expect(editTimes(segments, 0, 1040, 1100)).toMatch(/at least/);
+  });
+});
+
+describe("previous / next caption", () => {
+  it("jumps to the current caption's start, or the one before when already there", () => {
+    expect(previousCaptionStart(segments, 3500)).toBe(2890);
+    expect(previousCaptionStart(segments, 3000)).toBe(1040);
+    expect(previousCaptionStart(segments, 2700)).toBe(1040); // in the gap after caption 0
+    expect(previousCaptionStart(segments, 500)).toBe(0);
+  });
+
+  it("jumps to the next caption's start, or nowhere after the last", () => {
+    expect(nextCaptionStart(segments, 0)).toBe(1040);
+    expect(nextCaptionStart(segments, 1040)).toBe(2890);
+    expect(nextCaptionStart(segments, 3000)).toBeNull();
   });
 });

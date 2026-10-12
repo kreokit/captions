@@ -146,3 +146,23 @@ export function editTimes(
   const updated = { ...seg, start_ms, end_ms, words };
   return segments.map((s, i) => (i === index ? updated : s));
 }
+
+/** How close to a caption's start counts as "at" it when jumping back. */
+const AT_START_MS = 300;
+
+/**
+ * Where "previous caption" jumps from `ms`: the start of the caption playing (or the last
+ * one before a gap), unless already within 300 ms of it; then the one before that.
+ */
+export function previousCaptionStart(segments: Segment[], ms: number): number {
+  let i = segments.length - 1;
+  while (i >= 0 && segments[i].start_ms > ms) i--;
+  if (i >= 0 && ms - segments[i].start_ms <= AT_START_MS) i--;
+  return i >= 0 ? segments[i].start_ms : 0;
+}
+
+/** Where "next caption" jumps from `ms`: the next caption's start, or null at the end. */
+export function nextCaptionStart(segments: Segment[], ms: number): number | null {
+  const next = segments.find((s) => s.start_ms > ms);
+  return next ? next.start_ms : null;
+}

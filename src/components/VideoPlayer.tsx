@@ -8,7 +8,10 @@ import {
   outlineShadow,
   overlayFrame,
 } from "../lib/overlay";
+import { Pause, Play, SkipBack, SkipForward } from "lucide-react";
+import { nextCaptionStart, previousCaptionStart } from "../lib/captions";
 import { formatDuration } from "../lib/video";
+import { IconButton } from "../ui";
 import type { Segment, Style } from "../lib/types";
 import { useEditor } from "../store/editor";
 
@@ -121,7 +124,7 @@ export function VideoPlayer({ path }: { path: string }) {
         </div>
       </div>
       <PlayerControls playing={playing} onTogglePlay={togglePlay} />
-      {error && <p className="error">{error}</p>}
+      {error && <p className="player-error">{error}</p>}
     </div>
   );
 }
@@ -130,31 +133,35 @@ function PlayerControls({ playing, onTogglePlay }: { playing: boolean; onToggleP
   const currentMs = useEditor((s) => s.currentMs);
   const durationMs = useEditor((s) => s.durationMs);
   const seek = useEditor((s) => s.seek);
+  const segments = useEditor((s) => s.project?.segments ?? NO_SEGMENTS);
+  const next = nextCaptionStart(segments, currentMs);
   return (
-    <div className="controls-bar">
-      <button
-        type="button"
-        className="play"
-        onClick={onTogglePlay}
-        aria-label={playing ? "Pause" : "Play"}
-        title={playing ? "Pause (Space)" : "Play (Space)"}
-      >
-        {playing ? "❚❚" : "▶"}
-      </button>
-      <input
-        type="range"
-        className="seek"
-        aria-label="Seek"
-        min={0}
-        max={durationMs || 0}
-        step={10}
-        value={Math.min(currentMs, durationMs)}
-        onChange={(e) => seek(Number(e.target.value))}
-        disabled={!durationMs}
-      />
-      <span className="clock">
-        {formatDuration(Math.min(currentMs, durationMs))} / {formatDuration(durationMs)}
+    <div className="player-controls">
+      <span className="player-time tabular">
+        <span>{formatDuration(Math.min(currentMs, durationMs))}</span>
+        <span className="player-time-total"> / {formatDuration(durationMs)}</span>
       </span>
+      <div className="player-buttons">
+      <IconButton
+        icon={SkipBack}
+        label="Previous caption"
+        onClick={() => seek(previousCaptionStart(segments, currentMs))}
+      />
+      <IconButton
+        icon={playing ? Pause : Play}
+        label={playing ? "Pause" : "Play"}
+        shortcut="Space"
+        variant="primary"
+        className="player-play"
+        onClick={onTogglePlay}
+      />
+      <IconButton
+        icon={SkipForward}
+        label="Next caption"
+        disabled={next === null}
+        onClick={() => next !== null && seek(next)}
+      />
+      </div>
     </div>
   );
 }

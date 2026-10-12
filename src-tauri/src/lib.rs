@@ -221,6 +221,17 @@ fn cancel_transcription(cancel: State<'_, CancelFlag>) {
     cancel.0.store(true, Ordering::Relaxed);
 }
 
+/// Development aid: a project to open at startup, from `KREOKIT_DEV_OPEN`. Always `None`
+/// in release builds.
+#[tauri::command]
+fn dev_startup_project() -> Option<String> {
+    if cfg!(debug_assertions) {
+        std::env::var("KREOKIT_DEV_OPEN").ok()
+    } else {
+        None
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -235,7 +246,8 @@ pub fn run() {
             save_project,
             load_project,
             export_subtitles,
-            export_video
+            export_video,
+            dev_startup_project
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
