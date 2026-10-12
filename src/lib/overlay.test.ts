@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayText, overlayFrame } from "./overlay";
+import { displayText, outlineShadow, overlayFrame } from "./overlay";
 import { DEFAULT_STYLE } from "./presets";
 import type { CaptionMode, Segment, Style } from "./types";
 
@@ -71,5 +71,23 @@ describe("overlayFrame", () => {
 describe("displayText", () => {
   it("swaps ASS override characters like ass.rs", () => {
     expect(displayText("{\\b1}hi")).toBe("｛＼b1｝hi");
+  });
+});
+
+describe("outlineShadow", () => {
+  it("has no shadow without an outline", () => {
+    expect(outlineShadow(0, "#000000")).toBeUndefined();
+  });
+
+  it("surrounds the text at the outline radius, ~1 px apart", () => {
+    const shadows = outlineShadow(1, "#000000")!.split(", ");
+    expect(shadows).toHaveLength(8);
+    expect(shadows[0]).toBe("1.00px 0.00px 0 #000000");
+  });
+
+  it("adds an inner ring for thick outlines and caps the count", () => {
+    const shadows = outlineShadow(6, "#112233")!.split(", ");
+    expect(shadows).toHaveLength(38 + 19); // ceil(2π·6) + ceil(2π·3)
+    expect(outlineShadow(40, "#000000")!.split(", ")).toHaveLength(48 + 48);
   });
 });

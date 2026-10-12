@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { MARGIN_V, POP_MS, POP_SCALE, REFERENCE_HEIGHT, overlayFrame } from "../lib/overlay";
+import {
+  MARGIN_V,
+  POP_MS,
+  POP_SCALE,
+  REFERENCE_HEIGHT,
+  outlineShadow,
+  overlayFrame,
+} from "../lib/overlay";
 import { formatDuration } from "../lib/video";
 import type { Segment, Style } from "../lib/types";
 import { useEditor } from "../store/editor";
@@ -214,10 +221,8 @@ function overlayStyle(style: Style, scale: number): React.CSSProperties {
     // One line is exactly the ASS font size tall, as in libass.
     lineHeight: `${size}px`,
     color: style.color,
-    // The stroke is centred on the glyph edge; libass grows the glyph by the outline
-    // width, so stroke twice as wide and paint it under the fill.
-    WebkitTextStroke: style.outline_width > 0 ? `${style.outline_width * 2 * scale}px ${style.outline_color}` : undefined,
-    paintOrder: "stroke fill",
+    // Outline outside the fill with round corners, like libass (see outlineShadow).
+    textShadow: outlineShadow(style.outline_width * scale, style.outline_color),
     bottom: style.position === "bottom" ? margin : undefined,
     top: style.position === "top" ? margin : undefined,
     ["--pop-from" as string]: POP_SCALE,

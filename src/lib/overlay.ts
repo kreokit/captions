@@ -77,3 +77,26 @@ export function overlayFrame(segments: Segment[], ms: number, style: Style): Ove
     ),
   };
 }
+
+/**
+ * An outline as layered text-shadows: copies of the text offset around circles of the
+ * outline radius (and half of it, to fill thin strokes), ~1 px apart. Shadows are always
+ * drawn behind the text, so the outline grows outward with round corners like libass's,
+ * never into the letters. (-webkit-text-stroke draws over the fill, and WebKit on
+ * macOS 12 ignores paint-order for HTML text.)
+ */
+export function outlineShadow(radius: number, color: string): string | undefined {
+  if (radius <= 0) return undefined;
+  const rings = radius > 2 ? [radius, radius / 2] : [radius];
+  const shadows: string[] = [];
+  for (const r of rings) {
+    const steps = Math.min(48, Math.max(8, Math.ceil(2 * Math.PI * r)));
+    for (let i = 0; i < steps; i++) {
+      const angle = (2 * Math.PI * i) / steps;
+      const x = (r * Math.cos(angle)).toFixed(2);
+      const y = (r * Math.sin(angle)).toFixed(2);
+      shadows.push(`${x}px ${y}px 0 ${color}`);
+    }
+  }
+  return shadows.join(", ");
+}
