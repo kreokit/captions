@@ -1,5 +1,6 @@
 mod audio;
 mod ffmpeg;
+mod layout;
 mod model;
 mod models;
 mod probe;
