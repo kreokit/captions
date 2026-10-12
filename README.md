@@ -47,7 +47,7 @@ chmod +x KreoKit.Captions_*.AppImage
 
 or install the `.deb`: `sudo apt install ./KreoKit.Captions_*_amd64.deb`.
 
-Found a problem? [Report it here](https://github.com/kreokit/captions/issues/new/choose) (or use **⋯ → Report a problem** in the app).
+Found a problem? [Report it here](https://github.com/kreokit/captions/issues/new/choose). (Versions after 0.1.0-alpha also have **⋯ → Report a problem** in the app.)
 
 ## Features
 
