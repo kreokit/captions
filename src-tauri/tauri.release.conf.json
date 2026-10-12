@@ -11,6 +11,9 @@
     "shortDescription": "Free, offline auto-captions for your videos.",
     "macOS": {
       "signingIdentity": "-"
+    },
+    "resources": {
+      "binaries/FFMPEG-LICENSE.txt": "licenses/FFMPEG-LICENSE.txt"
     }
   }
 }
