@@ -7,13 +7,14 @@ import { fileName } from "../lib/video";
 import { useEditor } from "../store/editor";
 import { Menu, Tabs, toast } from "../ui";
 import { ExportMenu } from "./ExportMenu";
-import { Scrubber } from "./Scrubber";
+import { Timeline } from "./Timeline";
 import { SegmentList } from "./SegmentList";
 import { StylePanel } from "./StylePanel";
 import { VideoPlayer } from "./VideoPlayer";
 import "../styles/editor.css";
 import "../styles/captions.css";
 import "../styles/style-panel.css";
+import "../styles/timeline.css";
 
 type Tab = "captions" | "style";
 
@@ -161,7 +162,7 @@ export function Editor() {
         </aside>
       </div>
 
-      <Scrubber />
+      <Timeline />
     </div>
   );
 }

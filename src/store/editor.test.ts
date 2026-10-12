@@ -71,6 +71,15 @@ describe("editor store", () => {
     expect(useEditor.getState().selected).toBeNull();
   });
 
+  it("replaces all captions as one change", () => {
+    const store = useEditor.getState();
+    store.open(projectFromTranscript("/v.mp4", transcript, "base"), "/p.kreocap");
+    const moved = [{ ...transcript.segments[0], start_ms: 1100 }];
+    store.replaceSegments(moved);
+    expect(useEditor.getState().project?.segments).toBe(moved);
+    expect(useEditor.getState().dirty).toBe(true);
+  });
+
   it("reports rejected times without changing anything", () => {
     const store = useEditor.getState();
     store.open(projectFromTranscript("/v.mp4", transcript, "base"), "/p.kreocap");

@@ -33,6 +33,11 @@ interface EditorState {
   dirty: boolean;
   /** Playback position of the video. */
   currentMs: number;
+  /** The video is playing (the timeline follows the playhead). */
+  playing: boolean;
+  setPlaying(playing: boolean): void;
+  /** Replaces all captions at once, e.g. after a timeline drag (one change). */
+  replaceSegments(segments: Segment[]): void;
   /** Caption selected in the list / timeline (keyboard actions apply to it). */
   selected: number | null;
   select(index: number | null): void;
@@ -78,6 +83,9 @@ export const useEditor = create<EditorState>()((set, get) => {
     path: null,
     dirty: false,
     currentMs: 0,
+    playing: false,
+    setPlaying: (playing) => set({ playing }),
+    replaceSegments: (segments) => edit(() => segments),
     selected: null,
     select: (selected) => set({ selected }),
     durationMs: 0,

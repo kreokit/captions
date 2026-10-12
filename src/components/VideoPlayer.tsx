@@ -26,6 +26,7 @@ export function VideoPlayer({ path }: { path: string }) {
   const [error, setError] = useState<string | null>(null);
   const setCurrentMs = useEditor((s) => s.setCurrentMs);
   const setDurationMs = useEditor((s) => s.setDurationMs);
+  const setPlayingInStore = useEditor((s) => s.setPlaying);
   const setSeekHandler = useEditor((s) => s.setSeekHandler);
 
   useEffect(() => {
@@ -47,11 +48,13 @@ export function VideoPlayer({ path }: { path: string }) {
     };
     const onPlay = () => {
       setPlaying(true);
+      setPlayingInStore(true);
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(tick);
     };
     const onPause = () => {
       setPlaying(false);
+      setPlayingInStore(false);
       tick();
     };
     el.addEventListener("play", onPlay);
@@ -63,7 +66,7 @@ export function VideoPlayer({ path }: { path: string }) {
       el.removeEventListener("pause", onPause);
       el.removeEventListener("seeked", tick);
     };
-  }, [setCurrentMs]);
+  }, [setCurrentMs, setPlayingInStore]);
 
   // The frame is the largest box of the video's aspect ratio that fits the stage.
   useEffect(() => {

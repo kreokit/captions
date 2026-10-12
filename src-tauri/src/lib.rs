@@ -10,6 +10,7 @@ mod project;
 mod subtitles;
 mod transcribe;
 mod vad;
+mod waveform;
 #[cfg(test)]
 mod wer;
 
@@ -25,6 +26,10 @@ use model::{Project, Segment, Style};
 use models::{DownloadProgress, ModelInfo, WhisperModel};
 use probe::VideoInfo;
 use transcribe::Transcript;
+
+/// Waveform peaks per video path, computed once per session.
+#[derive(Default)]
+struct WaveformCache(std::sync::Mutex<std::collections::HashMap<String, std::sync::Arc<Vec<u8>>>>);
 
 /// Set by `cancel_transcription`; checked by model downloads and whisper.
 #[derive(Default)]
@@ -221,6 +226,30 @@ fn cancel_transcription(cancel: State<'_, CancelFlag>) {
     cancel.0.store(true, Ordering::Relaxed);
 }
 
+/// Timeline waveform for the video at `path`: one byte per 10 ms (see waveform.rs), sent
+/// as raw bytes. A video without audio gives an empty waveform.
+#[tauri::command]
+async fn get_waveform(
+    cache: State<'_, WaveformCache>,
+    path: String,
+) -> Result<tauri::ipc::Response, String> {
+    if let Some(peaks) = cache.0.lock().unwrap().get(&path).cloned() {
+        return Ok(tauri::ipc::Response::new(peaks.to_vec()));
+    }
+    let key = path.clone();
+    let peaks = blocking(move || {
+        Ok(match audio::extract_audio(&PathBuf::from(&path)) {
+            Ok(samples) => waveform::peaks(&samples),
+            Err(e) if e.contains("no audio track") => Vec::new(),
+            Err(e) => return Err(e),
+        })
+    })
+    .await?;
+    let peaks = std::sync::Arc::new(peaks);
+    cache.0.lock().unwrap().insert(key, peaks.clone());
+    Ok(tauri::ipc::Response::new(peaks.to_vec()))
+}
+
 /// Development aid: a project to open at startup, from `KREOKIT_DEV_OPEN`. Always `None`
 /// in release builds.
 #[tauri::command]
@@ -237,6 +266,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(CancelFlag::default())
+        .manage(WaveformCache::default())
         .invoke_handler(tauri::generate_handler![
             probe_video,
             list_models,
@@ -247,7 +277,8 @@ pub fn run() {
             load_project,
             export_subtitles,
             export_video,
-            dev_startup_project
+            dev_startup_project,
+            get_waveform
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

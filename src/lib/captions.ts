@@ -139,12 +139,17 @@ export function editTimes(
   if (prev && start_ms < prev.end_ms) return "The start overlaps the previous caption.";
   if (next && end_ms > next.start_ms) return "The end overlaps the next caption.";
 
+  const updated = retime(seg, start_ms, end_ms);
+  return segments.map((s, i) => (i === index ? updated : s));
+}
+
+/** The segment moved/stretched to [start_ms, end_ms], its words scaled along with it. */
+export function retime(seg: Segment, start_ms: number, end_ms: number): Segment {
   const oldSpan = Math.max(seg.end_ms - seg.start_ms, 1);
   const scale = (t: number) =>
     start_ms + Math.round(((t - seg.start_ms) * (end_ms - start_ms)) / oldSpan);
   const words = seg.words.map((w) => ({ ...w, start_ms: scale(w.start_ms), end_ms: scale(w.end_ms) }));
-  const updated = { ...seg, start_ms, end_ms, words };
-  return segments.map((s, i) => (i === index ? updated : s));
+  return { ...seg, start_ms, end_ms, words };
 }
 
 /** How close to a caption's start counts as "at" it when jumping back. */
