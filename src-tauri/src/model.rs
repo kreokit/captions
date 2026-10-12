@@ -36,7 +36,16 @@ pub enum CaptionMode {
     OneWord,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Animation {
+    None,
+    /// Each caption (or word, in one_word mode) scales up briefly as it appears.
+    Pop,
+}
+
 /// Caption look. Sizes are in pixels for a 1080 px tall frame and scale with the video.
+/// The default is the "Bold highlight" preset (src/lib/presets.ts).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Style {
@@ -50,21 +59,27 @@ pub struct Style {
     pub max_chars_per_line: u32,
     pub max_lines: u32,
     pub mode: CaptionMode,
+    pub bold: bool,
+    pub uppercase: bool,
+    pub animation: Animation,
 }
 
 impl Default for Style {
     fn default() -> Self {
         Self {
             font_family: "Arial".into(),
-            font_size: 64,
+            font_size: 72,
             color: "#FFFFFF".into(),
             highlight_color: "#FFD400".into(),
             outline_color: "#000000".into(),
-            outline_width: 4,
+            outline_width: 6,
             position: Position::Bottom,
-            max_chars_per_line: 32,
+            max_chars_per_line: 22,
             max_lines: 2,
             mode: CaptionMode::WordHighlight,
+            bold: true,
+            uppercase: true,
+            animation: Animation::None,
         }
     }
 }
@@ -80,4 +95,23 @@ pub struct Project {
     pub segments: Vec<Segment>,
     #[serde(default)]
     pub style: Style,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_style_is_the_bold_highlight_preset() {
+        let presets: serde_json::Value =
+            serde_json::from_str(include_str!("../../src/lib/presets.json")).unwrap();
+        let preset = presets
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["id"] == "bold-highlight")
+            .unwrap();
+        let style: Style = serde_json::from_value(preset["style"].clone()).unwrap();
+        assert_eq!(style, Style::default());
+    }
 }

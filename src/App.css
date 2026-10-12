@@ -369,10 +369,37 @@ button.secondary {
   top: 8%;
 }
 
+.editor-side {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.tabs button {
+  background: none;
+  color: var(--muted);
+  border-radius: 8px 8px 0 0;
+  padding: 8px 14px;
+  border-bottom: 2px solid transparent;
+}
+
+.tabs button[aria-selected="true"] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
 .editor-list {
+  flex: 1;
   min-height: 0;
   overflow-y: auto;
-  border-left: 1px solid var(--border);
   padding: 12px;
 }
 
@@ -498,4 +525,119 @@ button.link {
 .menu-items button:hover {
   background: var(--bg);
   filter: none;
+}
+
+/* Style panel */
+
+.style-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.style-panel h2 {
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+.presets {
+  display: grid;
+  gap: 8px;
+}
+
+.preset {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  font-weight: 400;
+}
+
+.preset span {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.preset.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fields > label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.875rem;
+}
+
+.slider span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.slider input {
+  accent-color: var(--accent);
+}
+
+.slider output {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.toggles,
+.colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.color {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+}
+
+.color input {
+  width: 32px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+}
+
+.segmented {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.segmented button {
+  flex: 1;
+  border-radius: 0;
+  background: none;
+  color: var(--text);
+  font-weight: 500;
+  padding: 6px;
+}
+
+.segmented button.active {
+  background: var(--accent);
+  color: var(--accent-text);
 }

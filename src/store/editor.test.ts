@@ -50,6 +50,16 @@ describe("editor store", () => {
     expect(useEditor.getState().dirty).toBe(false);
   });
 
+  it("changes the style and marks the project dirty only on real changes", () => {
+    const store = useEditor.getState();
+    store.open(projectFromTranscript("/v.mp4", transcript, "base"), "/p.kreocap");
+    store.setStyle({ font_size: useEditor.getState().project!.style.font_size });
+    expect(useEditor.getState().dirty).toBe(false);
+    store.setStyle({ position: "top" });
+    expect(useEditor.getState().project?.style.position).toBe("top");
+    expect(useEditor.getState().dirty).toBe(true);
+  });
+
   it("reports rejected times without changing anything", () => {
     const store = useEditor.getState();
     store.open(projectFromTranscript("/v.mp4", transcript, "base"), "/p.kreocap");

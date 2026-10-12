@@ -17,6 +17,7 @@ export interface Segment {
 
 export type Position = "bottom" | "middle" | "top";
 export type CaptionMode = "line" | "word_highlight" | "one_word";
+export type Animation = "none" | "pop";
 
 /** Sizes are in pixels for a 1080 px tall frame and scale with the video. */
 export interface Style {
@@ -30,6 +31,9 @@ export interface Style {
   max_chars_per_line: number;
   max_lines: number;
   mode: CaptionMode;
+  bold: boolean;
+  uppercase: boolean;
+  animation: Animation;
 }
 
 /** A `.kreocap` project file. Mirrors `Project` in src-tauri/src/model.rs. */

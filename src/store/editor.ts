@@ -8,7 +8,7 @@ import {
 } from "../lib/captions";
 import { DEFAULT_STYLE } from "../lib/project";
 import type { Transcript, WhisperModel } from "../lib/transcribe";
-import type { Project, Segment } from "../lib/types";
+import type { Project, Segment, Style } from "../lib/types";
 
 export function projectFromTranscript(
   videoPath: string,
@@ -49,6 +49,8 @@ interface EditorState {
   merge(index: number): void;
   remove(index: number): void;
   setText(index: number, text: string): void;
+  /** Changes some style fields; preview and exports follow. */
+  setStyle(patch: Partial<Style>): void;
   /** Returns an error message if the times are rejected. */
   setTimes(index: number, startMs: number, endMs: number): string | null;
 }
@@ -85,6 +87,13 @@ export const useEditor = create<EditorState>()((set, get) => {
       edit((s) =>
         s[index] && s[index].text !== text ? s.map((seg, i) => (i === index ? editText(seg, text) : seg)) : s,
       ),
+    setStyle: (patch) => {
+      const { project } = get();
+      if (!project) return;
+      const style = { ...project.style, ...patch };
+      const changed = (Object.keys(patch) as (keyof Style)[]).some((k) => project.style[k] !== style[k]);
+      if (changed) set({ project: { ...project, style }, dirty: true });
+    },
     setTimes: (index, startMs, endMs) => {
       const { project } = get();
       if (!project) return null;

@@ -5,6 +5,7 @@ import { fileName } from "../lib/video";
 import { useEditor } from "../store/editor";
 import { ExportMenu } from "./ExportMenu";
 import { SegmentList } from "./SegmentList";
+import { StylePanel } from "./StylePanel";
 import { VideoPlayer } from "./VideoPlayer";
 
 export function Editor() {
@@ -12,6 +13,7 @@ export function Editor() {
   const path = useEditor((s) => s.path);
   const dirty = useEditor((s) => s.dirty);
   const [status, setStatus] = useState<string | null>(null);
+  const [tab, setTab] = useState<"captions" | "style">("captions");
 
   const saveTo = useCallback(async (saveAs: boolean) => {
     const { project, path, markSaved } = useEditor.getState();
@@ -82,8 +84,21 @@ export function Editor() {
       </header>
       <div className="editor-body">
         <VideoPlayer path={project.video_path} />
-        <section className="editor-list">
-          <SegmentList />
+        <section className="editor-side">
+          <div className="tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "captions"}
+              onClick={() => setTab("captions")}
+            >
+              Captions
+            </button>
+            <button type="button" role="tab" aria-selected={tab === "style"} onClick={() => setTab("style")}>
+              Style
+            </button>
+          </div>
+          <div className="editor-list">{tab === "captions" ? <SegmentList /> : <StylePanel />}</div>
         </section>
       </div>
     </main>
