@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { confirm, open as openDialog, save } from "@tauri-apps/plugin-dialog";
-import { Ellipsis, FolderOpen, House, Save } from "lucide-react";
+import { Bug, Ellipsis, FolderOpen, House, Save } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import mark from "../assets/kreokit-mark.png";
 import { PROJECT_EXTENSION, openProjectFile, saveProject } from "../lib/project";
 import { touchRecent } from "../lib/recent";
@@ -135,6 +136,12 @@ export function Editor() {
               "separator",
               { label: "Open project…", icon: FolderOpen, shortcut: "⌘O", onSelect: () => void openProject() },
               { label: "Back to Home", icon: House, onSelect: () => void goHome() },
+              "separator",
+              {
+                label: "Report a problem",
+                icon: Bug,
+                onSelect: () => void invoke("report_problem").catch((e) => toast(String(e), "error")),
+              },
             ]}
           />
           <ExportMenu />
