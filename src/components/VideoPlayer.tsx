@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { REFERENCE_HEIGHT, overlayWords } from "../lib/overlay";
+import { MARGIN_V, POP_MS, POP_SCALE, REFERENCE_HEIGHT, overlayFrame } from "../lib/overlay";
 import { formatDuration } from "../lib/video";
 import type { Segment, Style } from "../lib/types";
 import { useEditor } from "../store/editor";
@@ -157,34 +157,70 @@ function CaptionOverlay({ scale }: { scale: number }) {
   const style = useEditor((s) => s.project?.style);
   const currentMs = useEditor((s) => s.currentMs);
   if (!style) return null;
-  const words = overlayWords(segments, currentMs, style.mode);
-  if (!words) return null;
+  const frame = overlayFrame(segments, currentMs, style);
+  if (!frame) return null;
 
   return (
-    <div className={`overlay overlay-${style.position}`} style={overlayStyle(style, scale)}>
-      <span>
-        {words.map((w, i) => (
-          <span key={i} style={w.active ? { color: style.highlight_color } : undefined}>
-            {w.text}
-            {i < words.length - 1 ? " " : ""}
-          </span>
-        ))}
-      </span>
+    <div
+      // A new key per caption restarts the pop animation, like a new ASS event.
+      key={style.animation === "pop" ? frame.key : undefined}
+      className={`overlay overlay-${style.position}${style.animation === "pop" ? " pop" : ""}`}
+      style={overlayStyle(style, scale)}
+    >
+      {frame.lines.map((line, l) => (
+        <div key={l} className="overlay-line">
+          {line.map((w, i) => (
+            <span key={i} style={w.active ? { color: style.highlight_color } : undefined}>
+              {w.text}
+              {i < line.length - 1 ? " " : ""}
+            </span>
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
 
 const NO_SEGMENTS: Segment[] = [];
 
+/**
+ * libass sizes text so that the font's ascender + descender equals the style's font
+ * size (measured on a burned frame: Arial Bold at 200 gives a 128 px "H"), while CSS
+ * sizes the em. Convert using the font's own metrics, measured once per font.
+ */
+const sizeRatios = new Map<string, number>();
+function emPerFontSize(family: string, bold: boolean): number {
+  const key = `${family}|${bold}`;
+  let ratio = sizeRatios.get(key);
+  if (ratio === undefined) {
+    const ctx = document.createElement("canvas").getContext("2d");
+    if (ctx) ctx.font = `${bold ? 700 : 400} 100px "${family}"`;
+    const m = ctx?.measureText("H");
+    const height = m ? m.fontBoundingBoxAscent + m.fontBoundingBoxDescent : 0;
+    ratio = height > 0 ? 100 / height : 1 / 1.15;
+    sizeRatios.set(key, ratio);
+  }
+  return ratio;
+}
+
+/** Sizes and positions from the same reference values as the ASS export (ass.rs). */
 function overlayStyle(style: Style, scale: number): React.CSSProperties {
-  const px = (n: number) => `${n * scale}px`;
+  const size = style.font_size * scale;
+  const margin = `${MARGIN_V * scale}px`;
   return {
-    fontFamily: style.font_family,
-    fontSize: px(style.font_size),
+    fontFamily: `"${style.font_family}"`,
+    fontWeight: style.bold ? 700 : 400,
+    fontSize: `${size * emPerFontSize(style.font_family, style.bold)}px`,
+    // One line is exactly the ASS font size tall, as in libass.
+    lineHeight: `${size}px`,
     color: style.color,
-    // The stroke is centred on the glyph edge, so double it; paint it under the fill.
-    WebkitTextStroke: `${px(style.outline_width * 2)} ${style.outline_color}`,
+    // The stroke is centred on the glyph edge; libass grows the glyph by the outline
+    // width, so stroke twice as wide and paint it under the fill.
+    WebkitTextStroke: style.outline_width > 0 ? `${style.outline_width * 2 * scale}px ${style.outline_color}` : undefined,
     paintOrder: "stroke fill",
-    maxWidth: `${style.max_chars_per_line}ch`,
+    bottom: style.position === "bottom" ? margin : undefined,
+    top: style.position === "top" ? margin : undefined,
+    ["--pop-from" as string]: POP_SCALE,
+    ["--pop-ms" as string]: `${POP_MS}ms`,
   };
 }

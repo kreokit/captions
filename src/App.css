@@ -345,19 +345,17 @@ button.secondary {
   white-space: nowrap;
 }
 
+/* Caption overlay: positioned like the ASS export (see overlayStyle in VideoPlayer). */
 .overlay {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  width: max-content;
   text-align: center;
-  line-height: 1.2;
-  font-weight: 700;
   pointer-events: none;
 }
 
-.overlay-bottom {
-  bottom: 8%;
+.overlay-line {
+  white-space: pre;
 }
 
 .overlay-middle {
@@ -365,8 +363,26 @@ button.secondary {
   transform: translate(-50%, -50%);
 }
 
-.overlay-top {
-  top: 8%;
+/* Pop: scale up from the caption's anchor, like \fscx/\fscy with \t in ASS. */
+.overlay.pop {
+  animation: overlay-pop var(--pop-ms) linear both;
+}
+
+.overlay-bottom.pop {
+  transform-origin: 50% 100%;
+}
+
+.overlay-top.pop {
+  transform-origin: 50% 0;
+}
+
+@keyframes overlay-pop {
+  from {
+    scale: var(--pop-from);
+  }
+  to {
+    scale: 1;
+  }
 }
 
 .editor-side {
