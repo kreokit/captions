@@ -76,7 +76,9 @@ def main() -> None:
     bad = [flag for flag in FORBIDDEN_CONFIG if flag in config]
     if bad:
         fail(f"not an LGPL build: {', '.join(bad)}")
-    if "GNU Lesser General Public License" not in run(str(ffmpeg), "-hide_banner", "-L"):
+    # The licence text is wrapped differently per version, so compare words, not lines.
+    licence = " ".join(run(str(ffmpeg), "-hide_banner", "-L").split())
+    if "GNU Lesser General Public License" not in licence:
         fail("ffmpeg -L does not show the LGPL")
     run(str(ffprobe), "-hide_banner", "-version")
 

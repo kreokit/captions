@@ -79,7 +79,7 @@ ASM=()
     --cc="clang -arch $ARCH" --cxx="clang++ -arch $ARCH" \
     --extra-cflags="-mmacosx-version-min=$MIN_MACOS -I$PREFIX/include" \
     --extra-ldflags="-mmacosx-version-min=$MIN_MACOS -L$PREFIX/lib" \
-    --pkg-config-flags=--static "${ASM[@]}" \
+    --pkg-config-flags=--static ${ASM[@]+"${ASM[@]}"} \
     --disable-debug --disable-doc --disable-ffplay --disable-network \
     --disable-autodetect \
     --enable-videotoolbox --enable-audiotoolbox \
