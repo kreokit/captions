@@ -3,6 +3,7 @@ import { confirm, save } from "@tauri-apps/plugin-dialog";
 import { PROJECT_EXTENSION, saveProject } from "../lib/project";
 import { fileName } from "../lib/video";
 import { useEditor } from "../store/editor";
+import { ExportMenu } from "./ExportMenu";
 import { SegmentList } from "./SegmentList";
 import { VideoPlayer } from "./VideoPlayer";
 
@@ -71,6 +72,7 @@ export function Editor() {
           {dirty && <span className="dirty" title="Unsaved changes"> •</span>}
         </h1>
         {status && <span className="hint">{status}</span>}
+        <ExportMenu onStatus={setStatus} />
         <button type="button" className="secondary" onClick={() => saveTo(true)}>
           Save As…
         </button>

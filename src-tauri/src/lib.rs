@@ -5,6 +5,7 @@ mod model;
 mod models;
 mod probe;
 mod project;
+mod subtitles;
 mod transcribe;
 mod vad;
 #[cfg(test)]
@@ -18,7 +19,7 @@ use serde::Serialize;
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, State};
 
-use model::Project;
+use model::{Project, Segment, Style};
 use models::{DownloadProgress, ModelInfo, WhisperModel};
 use probe::VideoInfo;
 use transcribe::Transcript;
@@ -145,6 +146,22 @@ async fn load_project(app: AppHandle, path: String) -> Result<Project, String> {
     Ok(project)
 }
 
+/// Writes the captions as an SRT or WebVTT file; returns the path written.
+#[tauri::command]
+async fn export_subtitles(
+    path: String,
+    format: subtitles::SubtitleFormat,
+    segments: Vec<Segment>,
+    style: Style,
+) -> Result<String, String> {
+    blocking(move || {
+        let text = subtitles::write(format, &subtitles::cues(&segments, &style));
+        std::fs::write(&path, text).map_err(|e| format!("cannot write {path}: {e}"))?;
+        Ok(path)
+    })
+    .await
+}
+
 #[tauri::command]
 fn cancel_transcription(cancel: State<'_, CancelFlag>) {
     cancel.0.store(true, Ordering::Relaxed);
@@ -162,7 +179,8 @@ pub fn run() {
             transcribe,
             cancel_transcription,
             save_project,
-            load_project
+            load_project,
+            export_subtitles
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

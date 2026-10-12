@@ -445,3 +445,57 @@ button.link {
   color: var(--accent);
   padding: 2px 6px;
 }
+
+/* Drop-down menu built on <details> */
+
+.menu {
+  position: relative;
+}
+
+.menu summary {
+  list-style: none;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  user-select: none;
+}
+
+.menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.menu summary[aria-disabled="true"] {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.menu-items {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 10;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+
+.menu-items button {
+  background: none;
+  color: var(--text);
+  text-align: left;
+  font-weight: 500;
+  padding: 8px 10px;
+  border-radius: 6px;
+}
+
+.menu-items button:hover {
+  background: var(--bg);
+  filter: none;
+}
