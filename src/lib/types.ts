@@ -1,3 +1,5 @@
+import type { WhisperModel } from "./transcribe";
+
 /** Mirrors src-tauri/src/model.rs. See CLAUDE.md "Data model". */
 export interface Word {
   start_ms: number;
@@ -11,4 +13,31 @@ export interface Segment {
   end_ms: number;
   text: string;
   words: Word[];
+}
+
+export type Position = "bottom" | "middle" | "top";
+export type CaptionMode = "line" | "word_highlight" | "one_word";
+
+/** Sizes are in pixels for a 1080 px tall frame and scale with the video. */
+export interface Style {
+  font_family: string;
+  font_size: number;
+  color: string;
+  highlight_color: string;
+  outline_color: string;
+  outline_width: number;
+  position: Position;
+  max_chars_per_line: number;
+  max_lines: number;
+  mode: CaptionMode;
+}
+
+/** A `.kreocap` project file. Mirrors `Project` in src-tauri/src/model.rs. */
+export interface Project {
+  version: number;
+  video_path: string;
+  language: string;
+  model: WhisperModel;
+  segments: Segment[];
+  style: Style;
 }

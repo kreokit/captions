@@ -3,6 +3,7 @@ mod ffmpeg;
 mod model;
 mod models;
 mod probe;
+mod project;
 mod transcribe;
 mod vad;
 #[cfg(test)]
@@ -16,6 +17,7 @@ use serde::Serialize;
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, State};
 
+use model::Project;
 use models::{DownloadProgress, ModelInfo, WhisperModel};
 use probe::VideoInfo;
 use transcribe::Transcript;
@@ -122,6 +124,20 @@ async fn transcribe(
     .await
 }
 
+/// Saves `project` to `path` and returns the final path (with `.kreocap` added if missing).
+#[tauri::command]
+async fn save_project(path: String, project: Project) -> Result<String, String> {
+    blocking(move || {
+        project::save(&PathBuf::from(path), &project).map(|p| p.to_string_lossy().into_owned())
+    })
+    .await
+}
+
+#[tauri::command]
+async fn load_project(path: String) -> Result<Project, String> {
+    blocking(move || project::load(&PathBuf::from(path))).await
+}
+
 #[tauri::command]
 fn cancel_transcription(cancel: State<'_, CancelFlag>) {
     cancel.0.store(true, Ordering::Relaxed);
@@ -137,7 +153,9 @@ pub fn run() {
             list_models,
             download_model,
             transcribe,
-            cancel_transcription
+            cancel_transcription,
+            save_project,
+            load_project
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
