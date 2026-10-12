@@ -9,17 +9,24 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::ffmpeg;
 use crate::models::CANCELLED;
 
-/// H.264 encoders in order of preference. Platform encoders first: they are fast and
-/// available in LGPL FFmpeg builds. libx264 (GPL) is only a fallback for development
-/// builds of FFmpeg; the bundled LGPL build won't have it (see CLAUDE.md).
-const ENCODERS: &[&str] = &[
-    #[cfg(target_os = "macos")]
-    "h264_videotoolbox",
-    #[cfg(target_os = "windows")]
-    "h264_mf",
-    "libopenh264",
-    "libx264",
-];
+/// H.264 encoders we may use, in order of preference. Platform encoders first (fast,
+/// present in LGPL FFmpeg builds), then OpenH264. libx264 is GPL (CLAUDE.md: no GPL
+/// components), so only development builds may fall back to it, for the GPL FFmpeg a
+/// developer may have installed; release builds never use it.
+fn allowed_encoders(dev_build: bool) -> Vec<&'static str> {
+    let mut encoders = Vec::new();
+    if cfg!(target_os = "macos") {
+        encoders.push("h264_videotoolbox");
+    }
+    if cfg!(target_os = "windows") {
+        encoders.push("h264_mf");
+    }
+    encoders.push("libopenh264");
+    if dev_build {
+        encoders.push("libx264");
+    }
+    encoders
+}
 
 /// Writes `ass` next to a fresh temp name and renders it onto `video`, writing an MP4 to
 /// `output`. `duration_ms` drives progress (0–100 via `on_progress`). On error or cancel
@@ -145,21 +152,34 @@ fn run_ffmpeg(
     Ok(())
 }
 
-/// The first preferred encoder this FFmpeg has.
+/// The first allowed encoder this FFmpeg has.
 fn pick_encoder(ffmpeg: &Path) -> Result<&'static str, String> {
     let output = Command::new(ffmpeg)
         .args(["-hide_banner", "-encoders"])
         .output()
         .map_err(|e| format!("failed to run {}: {e}", ffmpeg.display()))?;
-    let list = String::from_utf8_lossy(&output.stdout);
-    ENCODERS
+    pick_from(
+        &String::from_utf8_lossy(&output.stdout),
+        &allowed_encoders(cfg!(debug_assertions)),
+    )
+}
+
+/// Picks from `ffmpeg -encoders` output (" V....D name  description" lines).
+fn pick_from(encoder_list: &str, allowed: &[&'static str]) -> Result<&'static str, String> {
+    allowed
         .iter()
         .copied()
         .find(|enc| {
-            list.lines()
+            encoder_list
+                .lines()
                 .any(|l| l.split_whitespace().nth(1) == Some(enc))
         })
-        .ok_or_else(|| "this FFmpeg has no H.264 encoder".to_string())
+        .ok_or_else(|| {
+            format!(
+                "Can't export video: this FFmpeg has none of the allowed H.264 encoders ({}).",
+                allowed.join(", ")
+            )
+        })
 }
 
 /// Keeps roughly the source's bitrate (file size over duration), within 2–50 Mbit/s.
@@ -189,6 +209,27 @@ mod tests {
         assert_eq!(progress_percent("out_time_us=99999999", 9458), Some(99));
         assert_eq!(progress_percent("out_time_us=N/A", 9458), None);
         assert_eq!(progress_percent("frame=12", 9458), None);
+    }
+
+    #[test]
+    fn release_builds_never_use_libx264() {
+        assert!(!allowed_encoders(false).contains(&"libx264"));
+        assert_eq!(allowed_encoders(true).last(), Some(&"libx264"));
+        assert!(allowed_encoders(false).contains(&"libopenh264"));
+    }
+
+    #[test]
+    fn picks_the_first_allowed_encoder_available() {
+        let list = " V....D libx264    libx264 H.264\n V....D libopenh264  OpenH264 H.264\n";
+        assert_eq!(
+            pick_from(list, &["libopenh264", "libx264"]),
+            Ok("libopenh264")
+        );
+
+        let gpl_only = " V....D libx264    libx264 H.264\n";
+        let err = pick_from(gpl_only, &allowed_encoders(false)).unwrap_err();
+        assert!(err.contains("none of the allowed H.264 encoders"), "{err}");
+        assert!(!err.contains("libx264"), "{err}");
     }
 
     #[test]
