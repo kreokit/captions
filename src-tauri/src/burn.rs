@@ -293,7 +293,7 @@ mod tests {
         assert_eq!((result.width, result.height), (input.width, input.height));
         assert!(result.duration_ms.abs_diff(input.duration_ms) <= 100);
 
-        // At 1.2 s "WELCOME" is highlighted (#FFD400): look for yellow pixels.
+        // At 1.2 s "WELCOME" is highlighted in the default lime (#C8F135): look for it.
         let ffmpeg = ffmpeg::locate("ffmpeg").unwrap();
         let png = Path::new(env!("CARGO_MANIFEST_DIR")).join("target/burn-check.png");
         let frame = |args: &[&str]| {
@@ -307,17 +307,19 @@ mod tests {
         };
         frame(&[png.to_str().unwrap()]);
         let raw = frame(&["-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"]).stdout;
-        let yellow = raw
+        let lime = raw
             .as_chunks::<3>()
             .0
             .iter()
-            .filter(|p| p[0] > 200 && p[1] > 170 && p[2] < 90)
+            .filter(|p| p[0] > 160 && p[1] > 210 && p[2] < 110)
             .count();
         println!(
-            "yellow pixels at 1.2 s: {yellow}; frame saved to {}",
+            "lime pixels at 1.2 s: {lime}; frame saved to {}",
             png.display()
         );
-        assert!(yellow > 500, "highlighted word not visible");
+        // "WELCOME" covers ~500 px at 640x360; compression shifts some edge pixels out of
+        // the colour range, so allow for that.
+        assert!(lime > 250, "highlighted word not visible");
         let _ = std::fs::remove_file(&output);
     }
 }

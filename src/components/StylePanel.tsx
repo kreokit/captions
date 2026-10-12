@@ -1,11 +1,14 @@
-import { FONTS, PRESETS, matchingPreset } from "../lib/presets";
+import { Check } from "lucide-react";
+import { outlineShadow } from "../lib/overlay";
+import { FONTS, PRESETS, Preset, matchingPreset } from "../lib/presets";
 import type { CaptionMode, Position, Style } from "../lib/types";
 import { useEditor } from "../store/editor";
+import { ColorPicker, Field, SectionLabel, Segmented, Select, Slider, Switch } from "../ui";
 
 const MODES: { value: CaptionMode; label: string }[] = [
-  { value: "line", label: "Whole caption" },
-  { value: "word_highlight", label: "Highlight spoken word" },
-  { value: "one_word", label: "One word at a time" },
+  { value: "line", label: "Line" },
+  { value: "word_highlight", label: "Highlight" },
+  { value: "one_word", label: "One word" },
 ];
 
 const POSITIONS: { value: Position; label: string }[] = [
@@ -14,7 +17,13 @@ const POSITIONS: { value: Position; label: string }[] = [
   { value: "bottom", label: "Bottom" },
 ];
 
-/** Presets plus manual controls for the caption style; changes preview live. */
+const LINES = [
+  { value: "1", label: "1" },
+  { value: "2", label: "2" },
+  { value: "3", label: "3" },
+];
+
+/** Presets as rendered preview tiles, then Text / Colors / Layout controls. */
 export function StylePanel() {
   const style = useEditor((s) => s.project?.style);
   const setStyle = useEditor((s) => s.setStyle);
@@ -24,140 +33,133 @@ export function StylePanel() {
 
   return (
     <div className="style-panel">
-      <section>
-        <h2>Presets</h2>
-        <div className="presets">
+      <section className="style-section">
+        <SectionLabel>Presets</SectionLabel>
+        <div className="preset-grid" role="radiogroup" aria-label="Caption presets">
           {PRESETS.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className={p.id === active?.id ? "preset active" : "preset"}
-              aria-pressed={p.id === active?.id}
-              onClick={() => setStyle(p.style)}
-            >
-              <strong>{p.name}</strong>
-              <span>{p.description}</span>
-            </button>
+            <PresetTile key={p.id} preset={p} selected={p.id === active?.id} onSelect={() => setStyle(p.style)} />
           ))}
         </div>
       </section>
 
-      <section className="fields">
-        <h2>Text</h2>
-        <label>
-          Font
-          <select value={style.font_family} onChange={(e) => set("font_family", e.target.value)}>
-            {FONTS.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
-        </label>
-        <Slider label="Size" value={style.font_size} min={24} max={160} onChange={(v) => set("font_size", v)} />
-        <div className="toggles">
-          <Check label="Bold" checked={style.bold} onChange={(v) => set("bold", v)} />
-          <Check label="UPPERCASE" checked={style.uppercase} onChange={(v) => set("uppercase", v)} />
-          <Check
-            label="Pop in"
-            checked={style.animation === "pop"}
-            onChange={(v) => set("animation", v ? "pop" : "none")}
+      <section className="style-section">
+        <SectionLabel>Text</SectionLabel>
+        <Field label="Font" inline>
+          <Select
+            label="Font"
+            value={style.font_family}
+            onChange={(v) => set("font_family", v)}
+            options={FONTS.map((f) => ({ value: f, label: f, fontFamily: `"${f}"` }))}
           />
-        </div>
-        <div className="colors">
-          <Color label="Text" value={style.color} onChange={(v) => set("color", v)} />
-          <Color
-            label="Highlight"
-            value={style.highlight_color}
-            onChange={(v) => set("highlight_color", v)}
-          />
-          <Color label="Outline" value={style.outline_color} onChange={(v) => set("outline_color", v)} />
-        </div>
-        <Slider
-          label="Outline"
-          value={style.outline_width}
-          min={0}
-          max={12}
-          onChange={(v) => set("outline_width", v)}
-        />
+        </Field>
+        <SliderField label="Size" value={style.font_size} min={24} max={160} onChange={(v) => set("font_size", v)} />
+        <Switch label="Bold" checked={style.bold} onChange={(v) => set("bold", v)} />
+        <Switch label="Uppercase" checked={style.uppercase} onChange={(v) => set("uppercase", v)} />
+        <Switch label="Pop in" checked={style.animation === "pop"} onChange={(v) => set("animation", v ? "pop" : "none")} />
       </section>
 
-      <section className="fields">
-        <h2>Layout</h2>
-        <label>
-          Show
-          <select value={style.mode} onChange={(e) => set("mode", e.target.value as CaptionMode)}>
-            {MODES.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="segmented" role="radiogroup" aria-label="Position">
-          {POSITIONS.map((p) => (
-            <button
-              key={p.value}
-              type="button"
-              role="radio"
-              aria-checked={style.position === p.value}
-              className={style.position === p.value ? "active" : ""}
-              onClick={() => set("position", p.value)}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-        <Slider
+      <section className="style-section">
+        <SectionLabel>Colors</SectionLabel>
+        <Field label="Text" inline>
+          <ColorPicker label="Text color" value={style.color} onChange={(v) => set("color", v)} />
+        </Field>
+        <Field label="Highlight" inline>
+          <ColorPicker label="Highlight color" value={style.highlight_color} onChange={(v) => set("highlight_color", v)} />
+        </Field>
+        <Field label="Outline" inline>
+          <ColorPicker label="Outline color" value={style.outline_color} onChange={(v) => set("outline_color", v)} />
+        </Field>
+        <SliderField label="Outline width" value={style.outline_width} min={0} max={12} onChange={(v) => set("outline_width", v)} />
+      </section>
+
+      <section className="style-section">
+        <SectionLabel>Layout</SectionLabel>
+        <Field label="Show">
+          <Segmented label="Show" value={style.mode} options={MODES} onChange={(v) => set("mode", v)} />
+        </Field>
+        <Field label="Position">
+          <Segmented label="Position" value={style.position} options={POSITIONS} onChange={(v) => set("position", v)} />
+        </Field>
+        <SliderField
           label="Characters per line"
           value={style.max_chars_per_line}
           min={8}
           max={60}
           onChange={(v) => set("max_chars_per_line", v)}
         />
-        <Slider label="Lines" value={style.max_lines} min={1} max={3} onChange={(v) => set("max_lines", v)} />
+        <Field label="Lines" inline>
+          <Segmented
+            label="Lines"
+            value={String(style.max_lines)}
+            options={LINES}
+            onChange={(v) => set("max_lines", Number(v))}
+          />
+        </Field>
       </section>
     </div>
   );
 }
 
-function Slider(props: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  onChange: (value: number) => void;
-}) {
+function SliderField(props: { label: string; value: number; min: number; max: number; onChange: (v: number) => void }) {
   return (
-    <label className="slider">
-      <span>
-        {props.label} <output>{props.value}</output>
+    <div className="slider-field">
+      <div className="slider-field-head">
+        <span className="ui-field-label">{props.label}</span>
+        <span className="slider-field-value tabular">{props.value}</span>
+      </div>
+      <Slider label={props.label} value={props.value} min={props.min} max={props.max} onChange={props.onChange} />
+    </div>
+  );
+}
+
+/** Sample shown in each preset tile: "make it pop" with "pop" being spoken. */
+const SAMPLE = ["Make", "it", "pop"];
+const SPOKEN = 2;
+/** Tile previews draw the style at this fraction of its 1080 px reference size. */
+const TILE_SCALE = 0.26;
+
+function PresetTile({ preset, selected, onSelect }: { preset: Preset; selected: boolean; onSelect: () => void }) {
+  const s = preset.style;
+  const words = (s.mode === "one_word" ? [SAMPLE[SPOKEN]] : SAMPLE).map((w) => (s.uppercase ? w.toUpperCase() : w));
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      className={selected ? "preset-tile selected" : "preset-tile"}
+      onClick={onSelect}
+    >
+      <span className="preset-sample" aria-hidden>
+        <span
+          className="preset-sample-text"
+          style={{
+            fontFamily: `"${s.font_family}"`,
+            fontWeight: s.bold ? 700 : 400,
+            // Scaled from the style, but never wider than the tile (~0.66 em per character).
+            fontSize: `min(${Math.min(s.font_size * TILE_SCALE, 30)}px, ${88 / (words.join(" ").length * 0.66)}cqw)`,
+            color: s.color,
+            textShadow: outlineShadow(Math.max(s.outline_width * TILE_SCALE, s.outline_width ? 1 : 0), s.outline_color),
+          }}
+        >
+          {words.map((w, i) => {
+            const spoken = s.mode === "one_word" || (s.mode === "word_highlight" && i === SPOKEN);
+            return (
+              <span key={i} style={spoken ? { color: s.highlight_color } : undefined}>
+                {w}
+                {i < words.length - 1 ? " " : ""}
+              </span>
+            );
+          })}
+        </span>
       </span>
-      <input
-        type="range"
-        min={props.min}
-        max={props.max}
-        value={props.value}
-        onChange={(e) => props.onChange(Number(e.target.value))}
-      />
-    </label>
-  );
-}
-
-function Check(props: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
-  return (
-    <label className="checkbox">
-      <input type="checkbox" checked={props.checked} onChange={(e) => props.onChange(e.target.checked)} />
-      {props.label}
-    </label>
-  );
-}
-
-function Color(props: { label: string; value: string; onChange: (value: string) => void }) {
-  return (
-    <label className="color">
-      <input type="color" value={props.value} onChange={(e) => props.onChange(e.target.value.toUpperCase())} />
-      {props.label}
-    </label>
+      <span className="preset-name">
+        {preset.name}
+        {selected && (
+          <span className="preset-check">
+            <Check size={10} strokeWidth={3} aria-hidden />
+          </span>
+        )}
+      </span>
+    </button>
   );
 }

@@ -36,8 +36,8 @@ h1 {
   font-size: 0.875rem;
 }
 
-/* Legacy button look for screens not yet redesigned; UI kit buttons (ui-*) opt out. */
-button:not([class*="ui-"]) {
+/* Legacy button look, only on the Home screen until it is redesigned. */
+.home button:not([class*="ui-"]) {
   font: inherit;
   font-weight: 600;
   padding: 12px 28px;
@@ -48,16 +48,16 @@ button:not([class*="ui-"]) {
   cursor: pointer;
 }
 
-button:not([class*="ui-"]):hover:not(:disabled) {
+.home button:not([class*="ui-"]):hover:not(:disabled) {
   filter: brightness(1.08);
 }
 
-button:not([class*="ui-"]):disabled {
+.home button:not([class*="ui-"]):disabled {
   opacity: 0.6;
   cursor: default;
 }
 
-button:not([class*="ui-"]):focus-visible {
+.home button:not([class*="ui-"]):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
@@ -135,7 +135,7 @@ select {
   padding: 8px;
 }
 
-button.secondary:not([class*="ui-"]) {
+.home button.secondary:not([class*="ui-"]) {
   background: transparent;
   color: var(--text);
   border: 1px solid var(--border);
@@ -248,121 +248,6 @@ button.secondary:not([class*="ui-"]) {
   to {
     scale: 1;
   }
-}
-
-/* Style panel */
-
-.style-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.style-panel h2 {
-  font-size: 0.8125rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-  margin: 0 0 8px;
-}
-
-.presets {
-  display: grid;
-  gap: 8px;
-}
-
-.preset {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  text-align: left;
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-  padding: 10px 12px;
-  font-weight: 400;
-}
-
-.preset span {
-  font-size: 0.8125rem;
-  color: var(--muted);
-}
-
-.preset.active {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-
-.fields {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.fields > label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 0.875rem;
-}
-
-.slider span {
-  display: flex;
-  justify-content: space-between;
-}
-
-.slider input {
-  accent-color: var(--accent);
-}
-
-.slider output {
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.toggles,
-.colors {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.color {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.875rem;
-}
-
-.color input {
-  width: 32px;
-  height: 24px;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: none;
-}
-
-.segmented {
-  display: flex;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.segmented button {
-  flex: 1;
-  border-radius: 0;
-  background: none;
-  color: var(--text);
-  font-weight: 500;
-  padding: 6px;
-}
-
-.segmented button.active {
-  background: var(--accent);
-  color: var(--accent-text);
 }
 
 .custom-words {

@@ -290,6 +290,7 @@ mod tests {
     #[test]
     fn converts_colours_and_times() {
         assert_eq!(ass_color("#FFD400"), "&H0000D4FF");
+        assert_eq!(ass_color("#C8F135"), "&H0035F1C8");
         assert_eq!(ass_color("#0a0B0c"), "&H000C0B0A");
         assert_eq!(ass_color("red"), "&H00FFFFFF");
         assert_eq!(ass_time(0), "0:00:00.00");
@@ -329,7 +330,7 @@ mod tests {
     #[test]
     fn word_highlight_snapshot() {
         let ass = to_ass(&[hello()], &style(CaptionMode::WordHighlight), 1920, 1080);
-        let on = |w: &str| format!("{{\\c&H0000D4FF}}{w}{{\\c&H00FFFFFF}}");
+        let on = |w: &str| format!("{{\\c&H0035F1C8}}{w}{{\\c&H00FFFFFF}}");
         assert_eq!(
             dialogue(&ass),
             [
@@ -361,7 +362,7 @@ mod tests {
             ..style(CaptionMode::OneWord)
         };
         let ass = to_ass(&[hello()], &style, 1920, 1080);
-        let pop = "{\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}{\\c&H0000D4FF}";
+        let pop = "{\\fscx80\\fscy80\\t(0,120,\\fscx100\\fscy100)}{\\c&H0035F1C8}";
         assert_eq!(
             dialogue(&ass),
             [

@@ -13,6 +13,7 @@ import { StylePanel } from "./StylePanel";
 import { VideoPlayer } from "./VideoPlayer";
 import "../styles/editor.css";
 import "../styles/captions.css";
+import "../styles/style-panel.css";
 
 type Tab = "captions" | "style";
 

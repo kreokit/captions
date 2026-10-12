@@ -70,7 +70,7 @@ impl Default for Style {
             font_family: "Arial".into(),
             font_size: 72,
             color: "#FFFFFF".into(),
-            highlight_color: "#FFD400".into(),
+            highlight_color: "#C8F135".into(),
             outline_color: "#000000".into(),
             outline_width: 6,
             position: Position::Bottom,
