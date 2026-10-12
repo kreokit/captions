@@ -16,6 +16,7 @@ use whisper_rs::{
 
 use crate::model::{Segment, Word};
 use crate::models::{CANCELLED, WhisperModel};
+use crate::vad;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Transcript {
@@ -131,6 +132,8 @@ pub fn transcribe(
         });
     }
 
+    refine_with_audio(&mut segments, samples);
+
     let language = whisper_rs::get_lang_str(state.full_lang_id_from_state())
         .map(str::to_string)
         .or_else(|| language.map(str::to_string))
@@ -205,34 +208,135 @@ fn group_tokens(tokens: &[RawToken]) -> Vec<WordDraft> {
         .collect()
 }
 
-/// Final word timings. Whisper's classic token timestamps drift (on our fixture they were
-/// up to 1 s early), while the DTW time of a word's last token tracks where the word ends
-/// to within ~0.3 s. So: end = DTW time; start = the previous word's end, or the end minus
-/// the word's classic duration, whichever is later. Without DTW the classic times are kept.
-/// Times never go backwards; `prev_end_ms` carries across segments.
+/// Shortest duration we give a word, so word highlights never flash.
+const MIN_WORD_MS: u64 = 100;
+
+/// Word timings from DTW. Whisper's classic token timestamps drift (on our fixture they
+/// were up to 1 s early), while the DTW time of a word's last token tracks where the word
+/// ends to within ~0.3 s. So: end = DTW time; start = the end minus the word's classic
+/// duration, but not before the previous word's end.
+///
+/// Consecutive words whose DTW end doesn't advance (e.g. "the caption" both at 2060 ms)
+/// share one span, split in proportion to their classic durations. Every word gets at least
+/// [`MIN_WORD_MS`]. Without DTW the classic times are kept. Times never go backwards;
+/// `prev_end_ms` carries across segments.
 fn align_words(drafts: Vec<WordDraft>, prev_end_ms: &mut u64) -> Vec<Word> {
-    drafts
-        .into_iter()
-        .map(|d| {
-            let (start_ms, end_ms) = match d.dtw_end_ms {
-                Some(dtw_end) => {
-                    let end = dtw_end.max(*prev_end_ms);
-                    let duration = d.end_ms.saturating_sub(d.start_ms);
-                    (end.saturating_sub(duration).max(*prev_end_ms), end)
-                }
-                None => {
-                    let start = d.start_ms.max(*prev_end_ms);
-                    (start, d.end_ms.max(start))
-                }
-            };
-            *prev_end_ms = end_ms;
-            Word {
-                start_ms,
-                end_ms,
-                text: d.text,
+    let mut words = Vec::with_capacity(drafts.len());
+    let mut i = 0;
+    while i < drafts.len() {
+        let mut j = i + 1;
+        if let Some(run_end) = drafts[i].dtw_end_ms {
+            while j < drafts.len() && drafts[j].dtw_end_ms.is_some_and(|e| e <= run_end) {
+                j += 1;
             }
-        })
-        .collect()
+        }
+        let run = &drafts[i..j];
+        let weights: Vec<u64> = run
+            .iter()
+            .map(|d| d.end_ms.saturating_sub(d.start_ms).max(MIN_WORD_MS))
+            .collect();
+        let total: u64 = weights.iter().sum();
+
+        let (start, end) = match run[0].dtw_end_ms {
+            Some(dtw_end) => {
+                let end = dtw_end.max(*prev_end_ms);
+                (end.saturating_sub(total).max(*prev_end_ms), end)
+            }
+            None => {
+                let start = run[0].start_ms.max(*prev_end_ms);
+                (start, run[0].end_ms.max(start))
+            }
+        };
+        let end = end.max(start + MIN_WORD_MS * run.len() as u64);
+
+        // Split [start, end] by weight.
+        let mut t = start;
+        let mut acc = 0;
+        for (d, w) in run.iter().zip(&weights) {
+            acc += w;
+            let word_end = start + (end - start) * acc / total;
+            words.push(Word {
+                start_ms: t,
+                end_ms: word_end,
+                text: d.text.clone(),
+            });
+            t = word_end;
+        }
+        *prev_end_ms = end;
+        i = j;
+    }
+    words
+}
+
+/// Snaps word edges to pauses in `samples` and updates segment bounds to match.
+fn refine_with_audio(segments: &mut [Segment], samples: &[f32]) {
+    let voiced = vad::voiced_frames(samples);
+    let mut words: Vec<Word> = segments.iter().flat_map(|s| s.words.clone()).collect();
+    snap_to_speech(&mut words, &vad::onsets(&voiced), &vad::offsets(&voiced));
+
+    let mut words = words.into_iter();
+    for seg in segments {
+        seg.words = words.by_ref().take(seg.words.len()).collect();
+        if let (Some(first), Some(last)) = (seg.words.first(), seg.words.last()) {
+            seg.start_ms = first.start_ms;
+            seg.end_ms = last.end_ms;
+        }
+    }
+}
+
+/// How far a word edge may move to meet a pause in the audio.
+const SNAP_WINDOW_MS: u64 = 400;
+
+/// Moves word edges next to pauses onto the audio's actual silence↔speech transitions:
+/// each speech onset becomes the start of the word starting nearest to it, each offset
+/// the end of the word ending nearest to it (within [`SNAP_WINDOW_MS`]). With continuous
+/// sound (music) there are no transitions and nothing moves. Words stay ordered and at
+/// least [`MIN_WORD_MS`] long where there is room.
+fn snap_to_speech(words: &mut [Word], onsets: &[u64], offsets: &[u64]) {
+    fn nearest(times: impl Iterator<Item = u64>, target: u64) -> Option<(usize, u64)> {
+        times
+            .enumerate()
+            .map(|(i, t)| (i, t.abs_diff(target)))
+            .filter(|&(_, d)| d <= SNAP_WINDOW_MS)
+            .min_by_key(|&(_, d)| d)
+    }
+    let starts: Vec<u64> = words.iter().map(|w| w.start_ms).collect();
+    let ends: Vec<u64> = words.iter().map(|w| w.end_ms).collect();
+
+    // Each transition goes to the nearest word edge, and only if that edge has no closer
+    // transition of its own.
+    for &onset in onsets {
+        if let Some((i, d)) = nearest(starts.iter().copied(), onset)
+            && nearest(onsets.iter().copied(), starts[i]).is_some_and(|(_, best)| best == d)
+        {
+            words[i].start_ms = onset;
+        }
+    }
+    for &offset in offsets {
+        if let Some((i, d)) = nearest(ends.iter().copied(), offset)
+            && nearest(offsets.iter().copied(), ends[i]).is_some_and(|(_, best)| best == d)
+        {
+            words[i].end_ms = offset;
+        }
+    }
+
+    // Repair order: a moved start may now overlap the previous word, or a moved end the
+    // next one. Earlier edges win; later ones are pushed forward.
+    for i in 0..words.len() {
+        if i > 0 && words[i].start_ms < words[i - 1].end_ms {
+            let prev = &words[i - 1];
+            let room = words[i].start_ms.max(prev.start_ms + MIN_WORD_MS);
+            if room < prev.end_ms {
+                words[i - 1].end_ms = room;
+            }
+            words[i].start_ms = words[i].start_ms.max(words[i - 1].end_ms);
+        }
+        let min_end = words[i].start_ms + MIN_WORD_MS;
+        let next_start = words.get(i + 1).map_or(u64::MAX, |w| w.start_ms);
+        if words[i].end_ms < min_end {
+            words[i].end_ms = min_end.min(next_start.max(words[i].start_ms + 1));
+        }
+    }
 }
 
 /// Music symbols Whisper uses around sung lyrics.
@@ -374,7 +478,7 @@ mod tests {
             [
                 word("Welcome", 790, 1340),
                 word("to", 1400, 1560),
-                word("the", 2060, 2060)
+                word("the", 1960, 2060)
             ]
         );
         assert_eq!(prev_end, 2060);
@@ -395,18 +499,77 @@ mod tests {
     fn timings_never_go_backwards() {
         let drafts = vec![
             draft("a", 0, 300, Some(900)),
-            draft("b", 300, 500, Some(700)), // DTW earlier than the previous word
-            draft("c", 400, 600, None),      // no DTW, classic time also too early
+            draft("b", 300, 500, Some(700)), // DTW earlier: shares a's span
+            draft("c", 400, 600, None),      // no DTW, classic time too early: pushed, min length
         ];
         let mut prev_end = 0;
         assert_eq!(
             align_words(drafts, &mut prev_end),
             [
-                word("a", 600, 900),
-                word("b", 900, 900),
-                word("c", 900, 900)
+                word("a", 400, 700),
+                word("b", 700, 900),
+                word("c", 900, 1000)
             ]
         );
+    }
+
+    #[test]
+    fn words_sharing_a_dtw_end_split_the_span() {
+        // From the fixture: "the" and "caption" both had DTW end 2060 and "the" got 0 ms.
+        let drafts = vec![
+            draft("the", 950, 950, Some(2060)),
+            draft("caption", 1050, 1500, Some(2060)),
+        ];
+        let mut prev_end = 1560;
+        assert_eq!(
+            align_words(drafts, &mut prev_end),
+            [word("the", 1560, 1650), word("caption", 1650, 2060)]
+        );
+    }
+
+    #[test]
+    fn snaps_edges_next_to_pauses() {
+        let mut ws = vec![
+            word("Welcome", 790, 1340),
+            word("test,", 2300, 2800),
+            word("the", 2810, 3020),
+            word("captions.", 7560, 7980),
+        ];
+        snap_to_speech(&mut ws, &[1041, 2898], &[2647, 8254]);
+        assert_eq!(
+            ws,
+            [
+                word("Welcome", 1041, 1340),
+                word("test,", 2300, 2647),
+                word("the", 2898, 3020),
+                word("captions.", 7560, 8254)
+            ]
+        );
+    }
+
+    #[test]
+    fn a_transition_moves_only_the_nearest_edge() {
+        let mut ws = vec![word("a", 1000, 1200), word("b", 1200, 1400)];
+        snap_to_speech(&mut ws, &[1150], &[]);
+        assert_eq!(ws, [word("a", 1000, 1150), word("b", 1150, 1400)]);
+    }
+
+    #[test]
+    fn far_or_missing_transitions_change_nothing() {
+        let original = vec![word("a", 1000, 1200), word("b", 1200, 1400)];
+        let mut ws = original.clone();
+        snap_to_speech(&mut ws, &[], &[]);
+        assert_eq!(ws, original);
+        snap_to_speech(&mut ws, &[2000], &[100]);
+        assert_eq!(ws, original);
+    }
+
+    #[test]
+    fn snapping_keeps_words_ordered_and_long_enough() {
+        // An offset pulls "a" to end before it could be 100 ms long; it keeps the minimum.
+        let mut ws = vec![word("a", 1000, 1300), word("b", 1300, 1600)];
+        snap_to_speech(&mut ws, &[], &[1030]);
+        assert_eq!(ws, [word("a", 1000, 1100), word("b", 1300, 1600)]);
     }
 
     fn words(texts: &[&str]) -> Vec<Word> {
@@ -522,7 +685,7 @@ mod tests {
         assert!(wer < 0.3, "WER {wer:.3} is too high");
 
         // Speech intervals of hello.mp4 measured with ffmpeg's silencedetect (see
-        // scripts/make-fixtures.sh); captions should start and end within 0.35 s of them.
+        // scripts/make-fixtures.sh); captions should start and end within 0.15 s of them.
         let speech_ms = [(1_041, 2_647), (2_898, 5_347), (5_588, 8_254)];
         let words: Vec<&Word> = transcript.segments.iter().flat_map(|s| &s.words).collect();
         let sentence_ranges = [("welcome", "test"), ("the", "dog"), ("every", "captions")];
@@ -539,12 +702,19 @@ mod tests {
                 "sentence {first}…{last}: {start}–{end} ms, speech {speech_start}–{speech_end} ms"
             );
             assert!(
-                start.abs_diff(speech_start) <= 350,
+                start.abs_diff(speech_start) <= 150,
                 "{first} starts at {start} ms, speech at {speech_start} ms"
             );
             assert!(
-                end.abs_diff(speech_end) <= 350,
+                end.abs_diff(speech_end) <= 150,
                 "{last} ends at {end} ms, speech at {speech_end} ms"
+            );
+        }
+
+        for w in &words {
+            assert!(
+                w.end_ms - w.start_ms >= 80,
+                "{w:?} is too short to highlight"
             );
         }
 

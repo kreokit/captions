@@ -4,6 +4,7 @@ mod model;
 mod models;
 mod probe;
 mod transcribe;
+mod vad;
 #[cfg(test)]
 mod wer;
 
