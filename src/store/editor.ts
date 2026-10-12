@@ -33,6 +33,9 @@ interface EditorState {
   dirty: boolean;
   /** Playback position of the video. */
   currentMs: number;
+  /** Caption selected in the list / timeline (keyboard actions apply to it). */
+  selected: number | null;
+  select(index: number | null): void;
   /** Length of the video, once the player has loaded it (0 before). */
   durationMs: number;
   setDurationMs(ms: number): void;
@@ -61,7 +64,13 @@ export const useEditor = create<EditorState>()((set, get) => {
     const { project } = get();
     if (!project) return;
     const segments = change(project.segments);
-    if (segments !== project.segments) set({ project: { ...project, segments }, dirty: true });
+    if (segments === project.segments) return;
+    const { selected } = get();
+    set({
+      project: { ...project, segments },
+      dirty: true,
+      selected: selected === null || segments.length === 0 ? null : Math.min(selected, segments.length - 1),
+    });
   };
 
   return {
@@ -69,14 +78,17 @@ export const useEditor = create<EditorState>()((set, get) => {
     path: null,
     dirty: false,
     currentMs: 0,
+    selected: null,
+    select: (selected) => set({ selected }),
     durationMs: 0,
     setDurationMs: (durationMs) => set({ durationMs }),
     seek: () => {},
     setSeekHandler: (seek) => set({ seek }),
 
     open: (project, path) =>
-      set({ project, path, dirty: path === null, currentMs: 0, durationMs: 0 }),
-    close: () => set({ project: null, path: null, dirty: false, currentMs: 0, durationMs: 0 }),
+      set({ project, path, dirty: path === null, currentMs: 0, durationMs: 0, selected: null }),
+    close: () =>
+      set({ project: null, path: null, dirty: false, currentMs: 0, durationMs: 0, selected: null }),
     setCurrentMs: (currentMs) => set({ currentMs }),
     markSaved: (path) => set({ path, dirty: false }),
 

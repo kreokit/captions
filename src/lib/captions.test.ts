@@ -9,6 +9,7 @@ import {
   nextCaptionStart,
   parseTime,
   previousCaptionStart,
+  splitPointAt,
   splitSegment,
   wordIndexAtCaret,
 } from "./captions";
@@ -164,5 +165,22 @@ describe("previous / next caption", () => {
     expect(nextCaptionStart(segments, 0)).toBe(1040);
     expect(nextCaptionStart(segments, 1040)).toBe(2890);
     expect(nextCaptionStart(segments, 3000)).toBeNull();
+  });
+});
+
+describe("splitPointAt", () => {
+  const seg = segments[1]; // the(2890) quick(3020) fox.(3200)
+  it("cuts after the words already started", () => {
+    expect(splitPointAt(seg, 3100)).toBe(2); // during "quick": the quick | fox.
+    expect(splitPointAt(seg, 3020)).toBe(1); // exactly at "quick": the | quick fox.
+  });
+
+  it("falls back to the middle outside the segment or at its edges", () => {
+    expect(splitPointAt(seg, 0)).toBe(2);
+    expect(splitPointAt(seg, 9000)).toBe(2);
+  });
+
+  it("can't split a single word", () => {
+    expect(splitPointAt({ ...seg, words: seg.words.slice(0, 1) }, 3000)).toBe(0);
   });
 });

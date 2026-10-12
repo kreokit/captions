@@ -60,6 +60,17 @@ describe("editor store", () => {
     expect(useEditor.getState().dirty).toBe(true);
   });
 
+  it("keeps the selection inside the list after deleting", () => {
+    const store = useEditor.getState();
+    store.open(projectFromTranscript("/v.mp4", transcript, "base"), "/p.kreocap");
+    store.split(0, 1);
+    store.select(1);
+    store.remove(1);
+    expect(useEditor.getState().selected).toBe(0);
+    store.remove(0);
+    expect(useEditor.getState().selected).toBeNull();
+  });
+
   it("reports rejected times without changing anything", () => {
     const store = useEditor.getState();
     store.open(projectFromTranscript("/v.mp4", transcript, "base"), "/p.kreocap");

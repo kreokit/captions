@@ -12,6 +12,7 @@ import { SegmentList } from "./SegmentList";
 import { StylePanel } from "./StylePanel";
 import { VideoPlayer } from "./VideoPlayer";
 import "../styles/editor.css";
+import "../styles/captions.css";
 
 type Tab = "captions" | "style";
 
@@ -74,6 +75,21 @@ export function Editor() {
   // ⌘S saves, ⇧⌘S saves as, ⌘O opens.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const typing = (e.target as HTMLElement).closest("input, textarea, [contenteditable]");
+      // ←/→ step playback by 0.1 s (Shift: 1 s), unless typing or on a slider.
+      if (
+        (e.key === "ArrowLeft" || e.key === "ArrowRight") &&
+        !typing &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !(e.target as HTMLElement).closest('[role="slider"], [role="tablist"], [role="radiogroup"]')
+      ) {
+        e.preventDefault();
+        const { currentMs, durationMs, seek } = useEditor.getState();
+        const step = (e.shiftKey ? 1000 : 100) * (e.key === "ArrowLeft" ? -1 : 1);
+        seek(Math.min(Math.max(currentMs + step, 0), durationMs));
+        return;
+      }
       if (!(e.metaKey || e.ctrlKey)) return;
       const key = e.key.toLowerCase();
       if (key === "s") {

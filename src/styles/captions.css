@@ -1,0 +1,147 @@
+/* Caption list in the inspector: compact rows, inline editing. */
+
+.captions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  outline: none;
+}
+
+.captions-empty {
+  padding: var(--space-6) var(--space-2);
+  color: var(--color-text-3);
+  text-align: center;
+}
+
+.caption-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-3);
+  min-height: var(--size-row-min);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-3);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.caption-row:hover {
+  background: var(--color-surface-2);
+}
+
+.caption-row.selected {
+  background: var(--color-surface-3);
+}
+
+/* The caption playing now: lime bar on the left, lime-tinted background. */
+.caption-row.playing {
+  background: var(--color-accent-tint);
+}
+
+.caption-row.playing::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--color-accent);
+}
+
+.caption-row.editing {
+  grid-template-columns: minmax(0, 1fr);
+  background: var(--color-surface-2);
+  outline: 1px solid var(--color-border-strong);
+  cursor: default;
+}
+
+.caption-time {
+  font: var(--text-meta);
+  color: var(--color-text-3);
+  padding-top: 2px;
+}
+
+.caption-row.playing .caption-time {
+  color: var(--color-accent);
+}
+
+.caption-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+.caption-text em {
+  color: var(--color-text-3);
+}
+
+/* Actions appear on hover / selection, over the end of the text. */
+.caption-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: none;
+  gap: 2px;
+  padding: 2px;
+  background: var(--color-surface-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+}
+
+.caption-row:hover .caption-actions,
+.caption-row:focus-visible .caption-actions {
+  display: flex;
+}
+
+/* Inline editor */
+
+.caption-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.caption-editor-times {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-3);
+}
+
+.caption-editor-times .ui-input {
+  width: 88px;
+  height: var(--size-control-sm);
+  padding: 0 var(--space-2);
+  font: var(--text-meta);
+}
+
+.caption-editor-hint {
+  margin-left: auto;
+  font: var(--text-meta);
+  font-weight: 400;
+  color: var(--color-text-3);
+}
+
+.caption-editor-text {
+  height: auto;
+  min-height: var(--size-control);
+  padding: 6px var(--space-2);
+  resize: none;
+  overflow: hidden;
+  line-height: 20px;
+}
+
+.caption-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.caption-editor-error {
+  font: var(--text-meta);
+  font-weight: 400;
+  color: var(--color-danger);
+}

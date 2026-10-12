@@ -1,168 +1,286 @@
 import { useEffect, useRef, useState } from "react";
-import { findSegmentAt, parseTime, wordIndexAtCaret } from "../lib/captions";
+import { Merge, Pencil, Play, Scissors, Trash2 } from "lucide-react";
+import { findSegmentAt, parseTime, splitPointAt, wordIndexAtCaret } from "../lib/captions";
 import { formatDuration } from "../lib/video";
 import type { Segment } from "../lib/types";
 import { useEditor } from "../store/editor";
+import { IconButton, MenuEntry, toast, useContextMenu } from "../ui";
 
-/** Editable list of captions. The one playing is highlighted and kept in view. */
 const NO_SEGMENTS: Segment[] = [];
 
+/** "0:01.040" → "0:01.0": rows show tenths; the editor fields show milliseconds. */
+function shortTime(ms: number): string {
+  return formatDuration(ms).slice(0, -2);
+}
+
+/**
+ * Compact caption list. One tab stop: arrows move the selection, Enter edits, S splits at
+ * the playhead, M merges with the next, Delete removes. The playing caption is marked and
+ * kept in view.
+ */
 export function SegmentList() {
   const segments = useEditor((s) => s.project?.segments ?? NO_SEGMENTS);
-  const activeIndex = useEditor((s) =>
-    findSegmentAt(s.project?.segments ?? NO_SEGMENTS, s.currentMs),
-  );
+  const selected = useEditor((s) => s.selected);
+  const playing = useEditor((s) => findSegmentAt(s.project?.segments ?? NO_SEGMENTS, s.currentMs));
+  const [editing, setEditing] = useState<number | null>(null);
+  const list = useRef<HTMLDivElement>(null);
+  const focusIndex = selected ?? (playing >= 0 ? playing : 0);
+
+  // Follow playback, unless the user is working in the list.
+  useEffect(() => {
+    if (playing < 0 || list.current?.contains(document.activeElement)) return;
+    list.current
+      ?.querySelector(`[data-index="${playing}"]`)
+      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [playing]);
+
+  const focusRow = (index: number) => {
+    const { select, seek, project } = useEditor.getState();
+    const seg = project?.segments[index];
+    if (!seg) return;
+    select(index);
+    seek(seg.start_ms);
+    requestAnimationFrame(() => {
+      const row = list.current?.querySelector<HTMLElement>(`[data-index="${index}"]`);
+      row?.focus();
+      row?.scrollIntoView({ block: "nearest" });
+    });
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (editing !== null || e.metaKey || e.ctrlKey || e.altKey) return;
+    const { split, merge, remove, currentMs, project } = useEditor.getState();
+    const seg = project?.segments[focusIndex];
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        return focusRow(Math.min(focusIndex + 1, segments.length - 1));
+      case "ArrowUp":
+        e.preventDefault();
+        return focusRow(Math.max(focusIndex - 1, 0));
+      case "Enter":
+        e.preventDefault();
+        return setEditing(focusIndex);
+      case "s":
+      case "S":
+        if (!seg) return;
+        e.preventDefault();
+        if (seg.words.length < 2) return toast("This caption has one word; nothing to split.");
+        return split(focusIndex, splitPointAt(seg, currentMs));
+      case "m":
+      case "M":
+        e.preventDefault();
+        return merge(focusIndex);
+      case "Backspace":
+      case "Delete":
+        e.preventDefault();
+        remove(focusIndex);
+        return focusRow(Math.min(focusIndex, segments.length - 2));
+    }
+  };
 
   if (segments.length === 0) {
-    return <p className="hint">No captions. Nothing was recognised as speech.</p>;
+    return <p className="captions-empty">No captions. Nothing was recognised as speech.</p>;
   }
   return (
-    <ol className="segments">
+    <div
+      ref={list}
+      role="listbox"
+      aria-label="Captions"
+      aria-activedescendant={`caption-${focusIndex}`}
+      className="captions"
+      onKeyDown={onKeyDown}
+    >
       {segments.map((seg, i) => (
-        <SegmentRow
+        <CaptionRow
           key={seg.id}
           segment={seg}
           index={i}
-          active={i === activeIndex}
           isLast={i === segments.length - 1}
+          playing={i === playing}
+          selected={i === selected}
+          tabStop={i === focusIndex}
+          editing={i === editing}
+          onEdit={(on) => setEditing(on ? i : null)}
+          onFocusRow={() => focusRow(i)}
         />
       ))}
-    </ol>
+    </div>
   );
 }
 
-function SegmentRow({
+function CaptionRow({
   segment,
   index,
-  active,
   isLast,
+  playing,
+  selected,
+  tabStop,
+  editing,
+  onEdit,
+  onFocusRow,
 }: {
   segment: Segment;
   index: number;
-  active: boolean;
   isLast: boolean;
+  playing: boolean;
+  selected: boolean;
+  tabStop: boolean;
+  editing: boolean;
+  onEdit: (on: boolean) => void;
+  onFocusRow: () => void;
 }) {
-  const { seek, split, merge, remove, setText, setTimes } = useEditor.getState();
-  const row = useRef<HTMLLIElement>(null);
-  const textArea = useRef<HTMLTextAreaElement>(null);
-  const [draft, setDraft] = useState(segment.text);
-  const [timeError, setTimeError] = useState<string | null>(null);
+  const { seek, select, split, merge, remove } = useEditor.getState();
+  const canSplit = segment.words.length >= 2;
 
-  // Show external changes (split, merge, undoing a draft) in the text box.
-  useEffect(() => setDraft(segment.text), [segment.text]);
+  const splitAtPlayhead = () => split(index, splitPointAt(segment, useEditor.getState().currentMs));
+  const { onContextMenu, menu } = useContextMenu(
+    (): MenuEntry[] => [
+      { label: "Play from here", icon: Play, onSelect: () => seek(segment.start_ms) },
+      { label: "Edit text", icon: Pencil, shortcut: "↵", onSelect: () => onEdit(true) },
+      "separator",
+      { label: "Split at playhead", icon: Scissors, shortcut: "S", disabled: !canSplit, onSelect: splitAtPlayhead },
+      { label: "Merge with next", icon: Merge, shortcut: "M", disabled: isLast, onSelect: () => merge(index) },
+      "separator",
+      { label: "Delete", icon: Trash2, shortcut: "⌫", danger: true, onSelect: () => remove(index) },
+    ],
+    "Caption actions",
+  );
 
-  // Follow playback, but don't scroll away from a caption being edited.
-  useEffect(() => {
-    const list = row.current?.parentElement;
-    if (active && !list?.contains(document.activeElement)) {
-      row.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    }
-  }, [active]);
-
-  const commitText = () => setText(index, draft);
-
-  function splitAtCaret() {
-    const caret = textArea.current?.selectionStart ?? draft.length;
-    commitText();
-    split(index, wordIndexAtCaret(draft, caret));
-  }
-
-  function commitTime(which: "start" | "end", text: string) {
-    const ms = parseTime(text);
-    if (ms === null) {
-      setTimeError("Use a time like 1:23.456");
-      return;
-    }
-    const error =
-      which === "start"
-        ? setTimes(index, ms, segment.end_ms)
-        : setTimes(index, segment.start_ms, ms);
-    setTimeError(error);
-  }
+  const className = ["caption-row", playing && "playing", selected && "selected", editing && "editing"]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <li ref={row} className={active ? "segment active" : "segment"}>
-      <div className="times">
-        <button
-          type="button"
-          className="link"
-          title="Play from here"
-          onClick={() => seek(segment.start_ms)}
-        >
-          ▶
-        </button>
-        <TimeInput value={segment.start_ms} label="Start" onCommit={(t) => commitTime("start", t)} />
-        <span aria-hidden>–</span>
-        <TimeInput value={segment.end_ms} label="End" onCommit={(t) => commitTime("end", t)} />
-      </div>
-      <textarea
-        ref={textArea}
-        value={draft}
-        rows={2}
-        aria-label={`Caption ${index + 1} text`}
-        onChange={(e) => setDraft(e.target.value)}
-        onFocus={() => seek(segment.start_ms)}
-        onBlur={commitText}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            e.currentTarget.blur();
-          } else if (e.key === "Escape") {
-            setDraft(segment.text);
-          }
-        }}
-      />
-      {timeError && <p className="error">{timeError}</p>}
-      <div className="row-actions">
-        <button
-          type="button"
-          className="secondary"
-          title="Split this caption at the text cursor"
-          disabled={segment.words.length < 2}
-          onMouseDown={(e) => e.preventDefault()} // keep the caret in the text box
-          onClick={splitAtCaret}
-        >
-          Split
-        </button>
-        <button
-          type="button"
-          className="secondary"
-          title="Merge with the next caption"
-          disabled={isLast}
-          onClick={() => merge(index)}
-        >
-          Merge ↓
-        </button>
-        <button type="button" className="secondary" onClick={() => remove(index)}>
-          Delete
-        </button>
-      </div>
-    </li>
+    <div
+      id={`caption-${index}`}
+      data-index={index}
+      role="option"
+      aria-selected={selected}
+      tabIndex={tabStop && !editing ? 0 : -1}
+      className={className}
+      onClick={() => {
+        if (editing) return;
+        select(index);
+        seek(segment.start_ms);
+      }}
+      onDoubleClick={() => onEdit(true)}
+      onContextMenu={(e) => {
+        select(index);
+        onContextMenu(e);
+      }}
+    >
+      {editing ? (
+        <CaptionEditor segment={segment} index={index} onDone={() => (onEdit(false), onFocusRow())} />
+      ) : (
+        <>
+          <span className="caption-time tabular">{shortTime(segment.start_ms)}</span>
+          <span className="caption-text">{segment.text || <em>Empty caption</em>}</span>
+          <span className="caption-actions" onClick={(e) => e.stopPropagation()}>
+            <IconButton icon={Scissors} label="Split at playhead" shortcut="S" size="sm" disabled={!canSplit} tabIndex={-1} onClick={splitAtPlayhead} />
+            <IconButton icon={Merge} label="Merge with next" shortcut="M" size="sm" disabled={isLast} tabIndex={-1} onClick={() => merge(index)} />
+            <IconButton icon={Trash2} label="Delete" shortcut="⌫" size="sm" tabIndex={-1} onClick={() => remove(index)} />
+          </span>
+        </>
+      )}
+      {menu}
+    </div>
   );
 }
 
-function TimeInput({
-  value,
-  label,
-  onCommit,
-}: {
-  value: number;
-  label: string;
-  onCommit: (text: string) => void;
-}) {
-  const [text, setText] = useState(formatDuration(value));
-  useEffect(() => setText(formatDuration(value)), [value]);
+/** Inline editor: start / end times and the text. Enter saves, Escape cancels. */
+function CaptionEditor({ segment, index, onDone }: { segment: Segment; index: number; onDone: () => void }) {
+  const { setText, setTimes, split } = useEditor.getState();
+  const [text, setTextDraft] = useState(segment.text);
+  const [start, setStart] = useState(formatDuration(segment.start_ms));
+  const [end, setEnd] = useState(formatDuration(segment.end_ms));
+  const [error, setError] = useState<string | null>(null);
+  const textArea = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = textArea.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, []);
+
+  // Grow with the text.
+  useEffect(() => {
+    const el = textArea.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [text]);
+
+  const save = (): boolean => {
+    const startMs = parseTime(start);
+    const endMs = parseTime(end);
+    if (startMs === null || endMs === null) {
+      setError("Use times like 1:23.456");
+      return false;
+    }
+    if (startMs !== segment.start_ms || endMs !== segment.end_ms) {
+      const problem = setTimes(index, startMs, endMs);
+      if (problem) {
+        setError(problem);
+        return false;
+      }
+    }
+    setText(index, text.trim());
+    return true;
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    e.stopPropagation();
+    if (e.key === "Escape") {
+      e.preventDefault();
+      onDone();
+    } else if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (save()) onDone();
+    }
+  };
+
   return (
-    <input
-      className="time"
-      aria-label={label}
-      value={text}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={() => text !== formatDuration(value) && onCommit(text)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur();
-        if (e.key === "Escape") setText(formatDuration(value));
+    <div
+      className="caption-editor"
+      onKeyDown={onKeyDown}
+      onClick={(e) => e.stopPropagation()}
+      onBlur={(e) => {
+        // Focus leaving the editor (not moving between its fields) saves.
+        if (!e.currentTarget.contains(e.relatedTarget as Node) && save()) onDone();
       }}
-    />
+    >
+      <div className="caption-editor-times">
+        <input className="ui-input tabular" aria-label="Start" value={start} onChange={(e) => setStart(e.target.value)} />
+        <span aria-hidden>–</span>
+        <input className="ui-input tabular" aria-label="End" value={end} onChange={(e) => setEnd(e.target.value)} />
+        <span className="caption-editor-hint">↵ save · esc cancel</span>
+      </div>
+      <textarea
+        ref={textArea}
+        className="ui-input caption-editor-text"
+        aria-label={`Caption ${index + 1} text`}
+        value={text}
+        rows={1}
+        onChange={(e) => setTextDraft(e.target.value)}
+      />
+      <div className="caption-editor-actions">
+        <IconButton
+          icon={Scissors}
+          label="Split at text cursor"
+          size="sm"
+          disabled={segment.words.length < 2}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            const caret = textArea.current?.selectionStart ?? text.length;
+            setText(index, text.trim());
+            split(index, wordIndexAtCaret(text, caret));
+            onDone();
+          }}
+        />
+      </div>
+      {error && <p className="caption-editor-error">{error}</p>}
+    </div>
   );
 }

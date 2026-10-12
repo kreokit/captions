@@ -166,3 +166,16 @@ export function nextCaptionStart(segments: Segment[], ms: number): number | null
   const next = segments.find((s) => s.start_ms > ms);
   return next ? next.start_ms : null;
 }
+
+/**
+ * Where "split at playhead" cuts a segment: after every word that has started by `ms`
+ * (so a word being spoken stays in the first part). When the playhead is outside the
+ * segment or at its edges, splits in the middle instead. Returns a word index for
+ * splitSegment, or 0 when the segment can't be split.
+ */
+export function splitPointAt(segment: Segment, ms: number): number {
+  const count = segment.words.length;
+  if (count < 2) return 0;
+  const started = segment.words.filter((w) => w.start_ms < ms).length;
+  return started > 0 && started < count ? started : Math.round(count / 2);
+}
