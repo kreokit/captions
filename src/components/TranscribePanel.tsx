@@ -11,6 +11,8 @@ import {
   downloadModel,
   formatBytes,
   listModels,
+  loadCustomWords,
+  saveCustomWords,
   transcribe,
 } from "../lib/transcribe";
 import { projectFromTranscript, useEditor } from "../store/editor";
@@ -25,6 +27,7 @@ export function TranscribePanel({ videoPath }: { videoPath: string }) {
   const [model, setModel] = useState<WhisperModel>(DEFAULT_MODEL);
   const [language, setLanguage] = useState("auto");
   const [hideNonSpeech, setHideNonSpeech] = useState(true);
+  const [customWords, setCustomWords] = useState(loadCustomWords);
   const [run, setRun] = useState<RunState>({ status: "idle" });
   // Progress messages can arrive after a run has ended; only the active run may update.
   const runId = useRef(0);
@@ -61,7 +64,8 @@ export function TranscribePanel({ videoPath }: { videoPath: string }) {
         setModels(await listModels());
       }
       update({ status: "running", label: "Starting…", percent: null });
-      const transcript = await transcribe(videoPath, language, model, hideNonSpeech, (p) =>
+      saveCustomWords(customWords);
+      const transcript = await transcribe(videoPath, language, model, hideNonSpeech, customWords, (p) =>
         update({ status: "running", ...describeProgress(p) }),
       );
       if (runId.current === id) {
@@ -105,6 +109,19 @@ export function TranscribePanel({ videoPath }: { videoPath: string }) {
           </select>
         </label>
       </div>
+
+      <label className="custom-words">
+        Custom words
+        <input
+          type="text"
+          value={customWords}
+          onChange={(e) => setCustomWords(e.target.value)}
+          disabled={running}
+          placeholder="Names, brands, jargon — e.g. KreoKit, Dr. Okafor, TypeScript"
+          spellCheck={false}
+        />
+        <span className="hint">Separate with commas. Helps Whisper spell them right.</span>
+      </label>
 
       <label className="checkbox">
         <input

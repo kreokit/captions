@@ -25,15 +25,23 @@ pub struct Transcript {
     pub segments: Vec<Segment>,
 }
 
-/// `language`: a Whisper language code, or `None` to auto-detect.
-/// `hide_non_speech`: drop sound tags like "[MUSIC]" (see [`strip_non_speech`]).
+/// What to transcribe and how; see the fields.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Options<'a> {
+    /// A Whisper language code, or `None` to auto-detect.
+    pub language: Option<&'a str>,
+    /// Drop sound tags like "[MUSIC]" (see [`strip_non_speech`]).
+    pub hide_non_speech: bool,
+    /// Initial prompt for Whisper, e.g. from [`prompt_from_custom_words`].
+    pub prompt: Option<&'a str>,
+}
+
 /// `on_progress` receives 0–100. Returns [`CANCELLED`] if `cancel` is set.
 pub fn transcribe(
     model: WhisperModel,
     model_path: &Path,
     samples: &[f32],
-    language: Option<&str>,
-    hide_non_speech: bool,
+    options: Options,
     cancel: Arc<AtomicBool>,
     on_progress: impl FnMut(i32) + 'static,
 ) -> Result<Transcript, String> {
@@ -55,13 +63,16 @@ pub fn transcribe(
     // Same as whisper.cpp's default greedy params; beam search is ~3x slower on CPU.
     let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 5 });
     params.set_n_threads(thread_count());
-    params.set_language(Some(language.unwrap_or("auto")));
+    params.set_language(Some(options.language.unwrap_or("auto")));
     params.set_translate(false);
     params.set_token_timestamps(true);
     params.set_print_special(false);
     params.set_print_progress(false);
     params.set_print_realtime(false);
     params.set_print_timestamps(false);
+    if let Some(prompt) = options.prompt {
+        params.set_initial_prompt(prompt);
+    }
     params.set_progress_callback_safe(on_progress);
     let abort = cancel.clone();
     // whisper-rs 0.16 calls the closure as `F` but stores it as `Box<dyn FnMut>`, so `F`
@@ -102,7 +113,7 @@ pub fn transcribe(
             })
             .collect();
         let mut words = align_words(group_tokens(&tokens), &mut prev_end_ms);
-        if hide_non_speech && !words.is_empty() {
+        if options.hide_non_speech && !words.is_empty() {
             let kept = strip_non_speech(words.clone());
             if kept.is_empty() {
                 continue;
@@ -136,9 +147,22 @@ pub fn transcribe(
 
     let language = whisper_rs::get_lang_str(state.full_lang_id_from_state())
         .map(str::to_string)
-        .or_else(|| language.map(str::to_string))
+        .or_else(|| options.language.map(str::to_string))
         .unwrap_or_else(|| "auto".into());
     Ok(Transcript { language, segments })
+}
+
+/// Turns the user's "custom words" (names, brands, jargon; separated by commas or new
+/// lines) into a Whisper initial prompt. Whisper continues the prompt's style and
+/// spellings, so listing the words nudges it towards them. Returns None if there are none.
+pub fn prompt_from_custom_words(text: &str) -> Option<String> {
+    let mut seen = std::collections::HashSet::new();
+    let words: Vec<String> = text
+        .split([',', '\n', ';'])
+        .map(|w| w.replace('\0', "").trim().to_string())
+        .filter(|w| !w.is_empty() && seen.insert(w.to_lowercase()))
+        .collect();
+    (!words.is_empty()).then(|| words.join(", ") + ".")
 }
 
 fn thread_count() -> i32 {
@@ -629,6 +653,71 @@ mod tests {
     }
 
     #[test]
+    fn builds_a_prompt_from_custom_words() {
+        assert_eq!(
+            prompt_from_custom_words(" KreoKit, Zylvana\nMorvelle; kreokit ,, "),
+            Some("KreoKit, Zylvana, Morvelle.".into())
+        );
+        assert_eq!(prompt_from_custom_words(" , \n "), None);
+        assert_eq!(prompt_from_custom_words("a\0b"), Some("ab.".into()));
+    }
+
+    /// Transcribes fixtures/en/brands.mp4 (made-up names) with and without the names as
+    /// custom words. Needs ffmpeg and the base model:
+    /// `cargo test custom_words_fix_names -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn custom_words_fix_names() {
+        use crate::models::tests::dev_models_dir;
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../fixtures/en");
+        let reference = std::fs::read_to_string(fixtures.join("brands.txt")).unwrap();
+        let model = WhisperModel::Base.path_in(&dev_models_dir());
+        let samples = crate::audio::extract_audio(&fixtures.join("brands.mp4")).unwrap();
+        let run = |prompt: Option<&str>| {
+            let t = transcribe(
+                WhisperModel::Base,
+                &model,
+                &samples,
+                Options {
+                    language: Some("en"),
+                    hide_non_speech: true,
+                    prompt,
+                },
+                Arc::new(AtomicBool::new(false)),
+                |_| {},
+            )
+            .unwrap();
+            t.segments
+                .iter()
+                .map(|s| s.text.as_str())
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+
+        let names = ["KreoKit", "Zylvana", "Morvelle", "Quillhaven"];
+        let prompt = prompt_from_custom_words(&names.join(", ")).unwrap();
+        let without = run(None);
+        let with = run(Some(&prompt));
+        let wer = |h: &str| crate::wer::word_error_rate(&reference, h);
+        println!("reference: {}", reference.trim());
+        println!("without:   {without}  (WER {:.3})", wer(&without));
+        println!("with:      {with}  (WER {:.3})", wer(&with));
+
+        // Base model, synthetic voice: "Today Zylvana" runs together and still comes out
+        // as "today's Ilevana", so require most names, not all, plus a clear WER gain.
+        let fixed = names.iter().filter(|n| with.contains(*n)).count();
+        assert!(
+            fixed >= 3,
+            "only {fixed} of {} names right: {with}",
+            names.len()
+        );
+        assert!(
+            wer(&with) < wer(&without) / 2.0,
+            "custom words should clearly help"
+        );
+    }
+
+    #[test]
     fn converts_centiseconds() {
         assert_eq!(centis_to_ms(123), 1_230);
         assert_eq!(centis_to_ms(-1), 0);
@@ -654,8 +743,10 @@ mod tests {
             WhisperModel::Base,
             &model,
             &samples,
-            None,
-            true,
+            Options {
+                hide_non_speech: true,
+                ..Options::default()
+            },
             Arc::new(AtomicBool::new(false)),
             |_| {},
         )

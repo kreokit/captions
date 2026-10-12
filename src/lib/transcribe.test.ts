@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { LANGUAGES, MODEL_LABELS, describeProgress, formatBytes } from "./transcribe";
+import {
+  LANGUAGES,
+  MODEL_LABELS,
+  describeProgress,
+  formatBytes,
+  loadCustomWords,
+  saveCustomWords,
+} from "./transcribe";
 
 describe("formatBytes", () => {
   it("formats model sizes", () => {
@@ -37,5 +44,13 @@ describe("catalog", () => {
 
   it("labels every model the backend knows", () => {
     expect(Object.keys(MODEL_LABELS)).toEqual(["base", "small", "large-v3-turbo"]);
+  });
+});
+
+describe("custom words storage", () => {
+  it("falls back to empty when storage is unavailable", () => {
+    // Vitest runs in Node without localStorage: both calls must not throw.
+    saveCustomWords("KreoKit");
+    expect(typeof loadCustomWords()).toBe("string");
   });
 });

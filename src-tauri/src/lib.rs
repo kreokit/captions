@@ -86,8 +86,10 @@ async fn download_model(
 
 /// Transcribes the audio of the video at `path`. `language` is a Whisper code
 /// ("en", "de", …) or `None` to auto-detect. `hide_non_speech` (default true) drops
-/// sound tags like "[MUSIC]". The model must be downloaded.
+/// sound tags like "[MUSIC]". `custom_words` (names, brands, jargon; comma-separated) are
+/// passed to Whisper as its initial prompt. The model must be downloaded.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)] // arguments map 1:1 to the frontend's invoke() call
 async fn transcribe(
     app: AppHandle,
     cancel: State<'_, CancelFlag>,
@@ -95,6 +97,7 @@ async fn transcribe(
     language: Option<String>,
     model: WhisperModel,
     hide_non_speech: Option<bool>,
+    custom_words: Option<String>,
     on_progress: Channel<TranscribeProgress>,
 ) -> Result<Transcript, String> {
     let model_path = model.path_in(&models_dir(&app)?);
@@ -111,14 +114,20 @@ async fn transcribe(
             return Err(models::CANCELLED.to_string());
         }
 
+        let prompt = custom_words
+            .as_deref()
+            .and_then(transcribe::prompt_from_custom_words);
         let _ = on_progress.send(TranscribeProgress::LoadingModel);
         let progress = on_progress.clone();
         transcribe::transcribe(
             model,
             &model_path,
             &samples,
-            language.as_deref(),
-            hide_non_speech.unwrap_or(true),
+            transcribe::Options {
+                language: language.as_deref(),
+                hide_non_speech: hide_non_speech.unwrap_or(true),
+                prompt: prompt.as_deref(),
+            },
             cancel,
             move |percent| {
                 let _ = progress.send(TranscribeProgress::Transcribing { percent });

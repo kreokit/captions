@@ -87,6 +87,7 @@ export function transcribe(
   language: string,
   model: WhisperModel,
   hideNonSpeech: boolean,
+  customWords: string,
   onProgress: (p: TranscribeProgress) => void,
 ): Promise<Transcript> {
   const channel = new Channel<TranscribeProgress>();
@@ -96,8 +97,28 @@ export function transcribe(
     language: language === "auto" ? null : language,
     model,
     hideNonSpeech,
+    customWords: customWords.trim() || null,
     onProgress: channel,
   });
+}
+
+const CUSTOM_WORDS_KEY = "kreokit.customWords";
+
+/** The custom words used last time on this computer (a convenience; may be empty). */
+export function loadCustomWords(): string {
+  try {
+    return localStorage.getItem(CUSTOM_WORDS_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function saveCustomWords(words: string): void {
+  try {
+    localStorage.setItem(CUSTOM_WORDS_KEY, words);
+  } catch {
+    // Storage unavailable: the field just starts empty next time.
+  }
 }
 
 export function cancelTranscription(): Promise<void> {
