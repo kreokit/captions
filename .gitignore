@@ -25,3 +25,8 @@ dist-ssr
 
 # Rust build output (also in src-tauri/.gitignore)
 src-tauri/target/
+
+# Whisper models are downloaded into the app data dir; never commit them
+ggml-*.bin
+*.bin.part
+/models/

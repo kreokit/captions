@@ -8,6 +8,7 @@ import {
   formatFps,
   probeVideo,
 } from "./lib/video";
+import { TranscribePanel } from "./components/TranscribePanel";
 import "./App.css";
 
 type ProbeState =
@@ -55,7 +56,7 @@ function App() {
       </section>
 
       {probe.status !== "idle" && (
-        <section className="result" aria-live="polite">
+        <section className="panel result" aria-live="polite">
           <h2 title={probe.path}>{fileName(probe.path)}</h2>
           {probe.status === "probing" && <p>Reading video…</p>}
           {probe.status === "error" && <p className="error">{probe.message}</p>}
@@ -72,6 +73,11 @@ function App() {
             </dl>
           )}
         </section>
+      )}
+
+      {/* Transcription only needs ffmpeg, so a failed probe doesn't block it. */}
+      {(probe.status === "done" || probe.status === "error") && (
+        <TranscribePanel videoPath={probe.path} />
       )}
     </main>
   );

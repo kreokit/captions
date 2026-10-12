@@ -22,7 +22,7 @@ The first launch downloads a speech model (~150 MB–1.5 GB depending on the qua
 
 ## Build from source
 
-Requirements: Rust (stable), Node.js 20+, pnpm, FFmpeg.
+Requirements: Rust (stable), Node.js 20+, pnpm, FFmpeg, CMake (to build whisper.cpp).
 
 ```bash
 git clone https://github.com/kreokit/captions
