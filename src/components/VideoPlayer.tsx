@@ -1,17 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { REFERENCE_HEIGHT, overlayWords } from "../lib/overlay";
+import { formatDuration } from "../lib/video";
 import type { Segment, Style } from "../lib/types";
 import { useEditor } from "../store/editor";
 
-/** Video with the live caption overlay. Publishes the playback position to the store. */
+/** Video with the live caption overlay and playback controls. Publishes the playback
+ * position to the store. */
 export function VideoPlayer({ path }: { path: string }) {
   const video = useRef<HTMLVideoElement>(null);
-  const frame = useRef<HTMLDivElement>(null);
+  const stage = useRef<HTMLDivElement>(null);
   const [aspect, setAspect] = useState(16 / 9);
-  const [scale, setScale] = useState(1);
+  const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
+  const [playing, setPlaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const setCurrentMs = useEditor((s) => s.setCurrentMs);
+  const setDurationMs = useEditor((s) => s.setDurationMs);
   const setSeekHandler = useEditor((s) => s.setSeekHandler);
 
   useEffect(() => {
@@ -31,53 +35,119 @@ export function VideoPlayer({ path }: { path: string }) {
       setCurrentMs(Math.round(el.currentTime * 1000));
       if (!el.paused) raf = requestAnimationFrame(tick);
     };
-    const start = () => {
+    const onPlay = () => {
+      setPlaying(true);
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(tick);
     };
-    el.addEventListener("play", start);
+    const onPause = () => {
+      setPlaying(false);
+      tick();
+    };
+    el.addEventListener("play", onPlay);
+    el.addEventListener("pause", onPause);
     el.addEventListener("seeked", tick);
     return () => {
       cancelAnimationFrame(raf);
-      el.removeEventListener("play", start);
+      el.removeEventListener("play", onPlay);
+      el.removeEventListener("pause", onPause);
       el.removeEventListener("seeked", tick);
     };
   }, [setCurrentMs]);
 
-  // Caption sizes are defined for a 1080 px frame; scale to the displayed frame.
+  // The frame is the largest box of the video's aspect ratio that fits the stage.
   useEffect(() => {
-    const el = frame.current;
+    const el = stage.current;
     if (!el) return;
     const observer = new ResizeObserver(([entry]) =>
-      setScale(entry.contentRect.height / REFERENCE_HEIGHT),
+      setStageSize({ width: entry.contentRect.width, height: entry.contentRect.height }),
     );
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+  const frameWidth = Math.min(stageSize.width, stageSize.height * aspect);
+  const frameHeight = frameWidth / aspect;
+
+  // Space toggles playback, unless the user is typing or on a button.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== "Space" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement;
+      if (target.closest("input, textarea, select, button, [contenteditable]")) return;
+      e.preventDefault();
+      togglePlay();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  function togglePlay() {
+    const el = video.current;
+    if (!el) return;
+    if (el.paused) void el.play();
+    else el.pause();
+  }
 
   return (
     <div className="player">
-      <div className="frame" ref={frame} style={{ aspectRatio: aspect }}>
-        <video
-          ref={video}
-          src={convertFileSrc(path)}
-          controls
-          playsInline
-          onLoadedMetadata={(e) => {
-            const { videoWidth, videoHeight } = e.currentTarget;
-            if (videoWidth && videoHeight) setAspect(videoWidth / videoHeight);
-            setError(null);
-          }}
-          onError={() =>
-            setError(
-              "This video can't be previewed here. MP4 and MOV (H.264) play best; " +
-                "other formats will get a preview copy in a later version.",
-            )
-          }
-        />
-        <CaptionOverlay scale={scale} />
+      <div className="stage" ref={stage}>
+        <div className="frame" style={{ width: frameWidth, height: frameHeight }}>
+          <video
+            ref={video}
+            src={convertFileSrc(path)}
+            playsInline
+            onClick={togglePlay}
+            onLoadedMetadata={(e) => {
+              const { videoWidth, videoHeight, duration } = e.currentTarget;
+              if (videoWidth && videoHeight) setAspect(videoWidth / videoHeight);
+              if (Number.isFinite(duration)) setDurationMs(Math.round(duration * 1000));
+              setError(null);
+            }}
+            onError={() =>
+              setError(
+                "This video can't be previewed here. MP4 and MOV (H.264) play best; " +
+                  "other formats will get a preview copy in a later version.",
+              )
+            }
+          />
+          <CaptionOverlay scale={frameHeight / REFERENCE_HEIGHT} />
+        </div>
       </div>
+      <PlayerControls playing={playing} onTogglePlay={togglePlay} />
       {error && <p className="error">{error}</p>}
+    </div>
+  );
+}
+
+function PlayerControls({ playing, onTogglePlay }: { playing: boolean; onTogglePlay: () => void }) {
+  const currentMs = useEditor((s) => s.currentMs);
+  const durationMs = useEditor((s) => s.durationMs);
+  const seek = useEditor((s) => s.seek);
+  return (
+    <div className="controls-bar">
+      <button
+        type="button"
+        className="play"
+        onClick={onTogglePlay}
+        aria-label={playing ? "Pause" : "Play"}
+        title={playing ? "Pause (Space)" : "Play (Space)"}
+      >
+        {playing ? "❚❚" : "▶"}
+      </button>
+      <input
+        type="range"
+        className="seek"
+        aria-label="Seek"
+        min={0}
+        max={durationMs || 0}
+        step={10}
+        value={Math.min(currentMs, durationMs)}
+        onChange={(e) => seek(Number(e.target.value))}
+        disabled={!durationMs}
+      />
+      <span className="clock">
+        {formatDuration(Math.min(currentMs, durationMs))} / {formatDuration(durationMs)}
+      </span>
     </div>
   );
 }
