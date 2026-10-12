@@ -41,7 +41,7 @@ pub fn burn_in(
     mut on_progress: impl FnMut(u32),
 ) -> Result<(), String> {
     let ffmpeg = ffmpeg::locate("ffmpeg")?;
-    let encoder = pick_encoder(&ffmpeg)?;
+    let encoders = pick_encoders(&ffmpeg)?;
     let bitrate = target_bitrate(video, duration_ms);
 
     // FFmpeg's filter syntax needs escaping for ':' and '\\' (Windows paths). Each export
@@ -52,19 +52,32 @@ pub fn burn_in(
         .map_or(0, |d| d.as_nanos());
     let work_dir =
         std::env::temp_dir().join(format!("kreokit-export-{}-{nanos}", std::process::id()));
+    // An encoder can be listed but unusable on this machine (e.g. Media Foundation missing
+    // on some Windows editions); if it fails before any video is written, try the next.
     let result = prepare_work_dir(&work_dir, ass, fonts_dir).and_then(|filter| {
-        run_ffmpeg(
-            &ffmpeg,
-            &work_dir,
-            video,
-            output,
-            &filter,
-            encoder,
-            bitrate,
-            duration_ms,
-            cancel,
-            &mut on_progress,
-        )
+        let mut failures = Vec::new();
+        for encoder in &encoders {
+            match run_ffmpeg(
+                &ffmpeg,
+                &work_dir,
+                video,
+                output,
+                &filter,
+                encoder,
+                bitrate,
+                duration_ms,
+                cancel,
+                &mut on_progress,
+            ) {
+                Ok(()) => return Ok(()),
+                Err(attempt) if !attempt.started && attempt.message != CANCELLED => {
+                    failures.push(format!("{encoder}: {}", attempt.message));
+                    let _ = std::fs::remove_file(output);
+                }
+                Err(attempt) => return Err(attempt.message),
+            }
+        }
+        Err(format!("export failed:\n{}", failures.join("\n")))
     });
     let _ = std::fs::remove_dir_all(&work_dir);
     if result.is_err() {
@@ -101,6 +114,13 @@ fn prepare_work_dir(
     Ok("ass=filename=captions.ass:fontsdir=fonts".into())
 }
 
+/// A failed FFmpeg run, and whether it had started writing video (then retrying with
+/// another encoder makes no sense).
+struct Attempt {
+    message: String,
+    started: bool,
+}
+
 #[allow(clippy::too_many_arguments)]
 fn run_ffmpeg(
     ffmpeg: &Path,
@@ -113,7 +133,7 @@ fn run_ffmpeg(
     duration_ms: u64,
     cancel: &AtomicBool,
     on_progress: &mut impl FnMut(u32),
-) -> Result<(), String> {
+) -> Result<(), Attempt> {
     let mut child = Command::new(ffmpeg)
         .current_dir(work_dir)
         .args([
@@ -137,13 +157,22 @@ fn run_ffmpeg(
             "-pix_fmt",
             "yuv420p",
         ])
+        // VideoToolbox may fall back to Apple's software encoder (e.g. in VMs).
+        .args(if encoder == "h264_videotoolbox" {
+            &["-allow_sw", "1"][..]
+        } else {
+            &[][..]
+        })
         .args(["-c:a", "aac", "-b:a", "192k"])
         .args(["-movflags", "+faststart"])
         .arg(absolute(output))
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("failed to run {}: {e}", ffmpeg.display()))?;
+        .map_err(|e| Attempt {
+            message: format!("failed to run {}: {e}", ffmpeg.display()),
+            started: false,
+        })?;
 
     // Collect errors on a thread so a chatty stderr can never block ffmpeg.
     let mut stderr = child.stderr.take().unwrap();
@@ -158,7 +187,10 @@ fn run_ffmpeg(
         if cancel.load(Ordering::Relaxed) {
             let _ = child.kill();
             let _ = child.wait();
-            return Err(CANCELLED.to_string());
+            return Err(Attempt {
+                message: CANCELLED.to_string(),
+                started: true,
+            });
         }
         let Ok(line) = line else { break };
         if let Some(percent) = progress_percent(&line, duration_ms)
@@ -169,20 +201,30 @@ fn run_ffmpeg(
         }
     }
 
-    let status = child.wait().map_err(|e| e.to_string())?;
+    let started = last.is_some_and(|p| p > 0);
+    let status = child.wait().map_err(|e| Attempt {
+        message: e.to_string(),
+        started,
+    })?;
     let errors = errors.join().unwrap_or_default();
     if cancel.load(Ordering::Relaxed) {
-        return Err(CANCELLED.to_string());
+        return Err(Attempt {
+            message: CANCELLED.to_string(),
+            started: true,
+        });
     }
     if !status.success() {
-        return Err(format!("export failed: {}", errors.trim()));
+        return Err(Attempt {
+            message: format!("export failed: {}", errors.trim()),
+            started,
+        });
     }
     on_progress(100);
     Ok(())
 }
 
-/// The first allowed encoder this FFmpeg has.
-fn pick_encoder(ffmpeg: &Path) -> Result<&'static str, String> {
+/// The allowed encoders this FFmpeg has, in order of preference.
+fn pick_encoders(ffmpeg: &Path) -> Result<Vec<&'static str>, String> {
     let output = Command::new(ffmpeg)
         .args(["-hide_banner", "-encoders"])
         .output()
@@ -193,22 +235,25 @@ fn pick_encoder(ffmpeg: &Path) -> Result<&'static str, String> {
     )
 }
 
-/// Picks from `ffmpeg -encoders` output (" V....D name  description" lines).
-fn pick_from(encoder_list: &str, allowed: &[&'static str]) -> Result<&'static str, String> {
-    allowed
+/// The allowed encoders listed in `ffmpeg -encoders` output (" V....D name  description"
+/// lines), in `allowed` order; an error if there are none.
+fn pick_from(encoder_list: &str, allowed: &[&'static str]) -> Result<Vec<&'static str>, String> {
+    let found: Vec<&'static str> = allowed
         .iter()
         .copied()
-        .find(|enc| {
+        .filter(|enc| {
             encoder_list
                 .lines()
                 .any(|l| l.split_whitespace().nth(1) == Some(enc))
         })
-        .ok_or_else(|| {
-            format!(
-                "Can't export video: this FFmpeg has none of the allowed H.264 encoders ({}).",
-                allowed.join(", ")
-            )
-        })
+        .collect();
+    if found.is_empty() {
+        return Err(format!(
+            "Can't export video: this FFmpeg has none of the allowed H.264 encoders ({}).",
+            allowed.join(", ")
+        ));
+    }
+    Ok(found)
 }
 
 /// Keeps roughly the source's bitrate (file size over duration), within 2–50 Mbit/s.
@@ -251,8 +296,8 @@ mod tests {
     fn picks_the_first_allowed_encoder_available() {
         let list = " V....D libx264    libx264 H.264\n V....D libopenh264  OpenH264 H.264\n";
         assert_eq!(
-            pick_from(list, &["libopenh264", "libx264"]),
-            Ok("libopenh264")
+            pick_from(list, &["h264_mf", "libopenh264", "libx264"]),
+            Ok(vec!["libopenh264", "libx264"])
         );
 
         let gpl_only = " V....D libx264    libx264 H.264\n";

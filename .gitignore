@@ -30,3 +30,6 @@ src-tauri/target/
 ggml-*.bin
 *.bin.part
 /models/
+
+# FFmpeg built from source for macOS releases (scripts/build-ffmpeg-macos.sh)
+/target-ffmpeg/
