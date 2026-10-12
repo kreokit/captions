@@ -59,6 +59,15 @@ Style   { font_family, font_size, color, highlight_color, outline_color,
 5. **Style + burn-in:** Style → ASS generator (including word-highlight using `\k`/override tags); FFmpeg burn-in export with progress
 6. **Release:** GitHub Actions matrix build (Windows, macOS, Linux) → unsigned artifacts on GitHub Releases
 
+## Backlog
+
+Not scheduled in a milestone yet:
+
+- **Undo / redo** for caption edits
+- **Prompt on window close** with unsaved changes (today only the editor's Home button asks)
+- **Recent projects** on the Home screen
+- **MKV / AVI preview:** WebKit can't play them; make a lightweight preview copy with FFmpeg
+
 ## Tests (our oracle)
 
 - `fixtures/` holds short clips with **hand-checked reference transcripts**. English clips are required (`fixtures/en/`; `scripts/make-fixtures.sh` generates a synthetic one); clips in other languages are optional
