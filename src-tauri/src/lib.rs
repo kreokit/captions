@@ -7,6 +7,7 @@ mod model;
 mod models;
 mod probe;
 mod project;
+mod recent;
 mod subtitles;
 mod transcribe;
 mod vad;
@@ -42,6 +43,15 @@ enum TranscribeProgress {
     LoadingModel,
     Transcribing { percent: i32 },
 }
+
+fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map_err(|e| format!("cannot find app data folder: {e}"))
+}
+
+/// Video files the app opens (also used to vet dropped files).
+const VIDEO_EXTENSIONS: &[&str] = &["mp4", "mov", "m4v", "mkv", "webm", "avi"];
 
 fn models_dir(app: &AppHandle) -> Result<PathBuf, String> {
     app.path()
@@ -250,6 +260,68 @@ async fn get_waveform(
     Ok(tauri::ipc::Response::new(peaks.to_vec()))
 }
 
+/// Recent projects for the Home screen, newest first, with thumbnails where possible.
+#[tauri::command]
+async fn list_recent(app: AppHandle) -> Result<Vec<recent::RecentEntry>, String> {
+    let dir = data_dir(&app)?;
+    let entries = blocking(move || {
+        Ok(recent::load(&dir)
+            .into_iter()
+            .map(|project| recent::RecentEntry {
+                exists: std::path::Path::new(&project.path).is_file(),
+                thumbnail: recent::thumbnail(&dir, std::path::Path::new(&project.video_path))
+                    .ok()
+                    .map(|p| p.to_string_lossy().into_owned()),
+                project,
+            })
+            .collect::<Vec<_>>())
+    })
+    .await?;
+    for thumb in entries.iter().filter_map(|e| e.thumbnail.as_ref()) {
+        let _ = app.asset_protocol_scope().allow_file(thumb);
+    }
+    Ok(entries)
+}
+
+/// Moves (or adds) a project to the top of the recent list.
+#[tauri::command]
+fn touch_recent(app: AppHandle, path: String, video_path: String) -> Result<(), String> {
+    recent::touch(&data_dir(&app)?, &path, &video_path, recent::now_ms())
+}
+
+#[tauri::command]
+fn remove_recent(app: AppHandle, path: String) -> Result<(), String> {
+    recent::remove(&data_dir(&app)?, &path)
+}
+
+/// A thumbnail for a video (cached), viewable by the webview.
+#[tauri::command]
+async fn video_thumbnail(app: AppHandle, path: String) -> Result<String, String> {
+    let dir = data_dir(&app)?;
+    let thumb = blocking(move || recent::thumbnail(&dir, std::path::Path::new(&path))).await?;
+    app.asset_protocol_scope()
+        .allow_file(&thumb)
+        .map_err(|e| e.to_string())?;
+    Ok(thumb.to_string_lossy().into_owned())
+}
+
+/// Lets the webview play a video the user dropped on the window (files picked in a
+/// dialog are allowed automatically). Only existing video files are accepted.
+#[tauri::command]
+fn allow_dropped_video(app: AppHandle, path: String) -> Result<(), String> {
+    let path = PathBuf::from(path);
+    let is_video = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| VIDEO_EXTENSIONS.contains(&e.to_lowercase().as_str()));
+    if !is_video || !path.is_file() {
+        return Err("Drop a video file (MP4, MOV, M4V, MKV, WebM or AVI).".into());
+    }
+    app.asset_protocol_scope()
+        .allow_file(&path)
+        .map_err(|e| e.to_string())
+}
+
 /// Development aid: a project to open at startup, from `KREOKIT_DEV_OPEN`. Always `None`
 /// in release builds.
 #[tauri::command]
@@ -278,7 +350,12 @@ pub fn run() {
             export_subtitles,
             export_video,
             dev_startup_project,
-            get_waveform
+            get_waveform,
+            list_recent,
+            touch_recent,
+            remove_recent,
+            video_thumbnail,
+            allow_dropped_video
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { confirm, open as openDialog, save } from "@tauri-apps/plugin-dialog";
 import { Ellipsis, FolderOpen, House, Save } from "lucide-react";
 import mark from "../assets/kreokit-mark.png";
-import { PROJECT_EXTENSION, loadProject, saveProject } from "../lib/project";
+import { PROJECT_EXTENSION, openProjectFile, saveProject } from "../lib/project";
+import { touchRecent } from "../lib/recent";
 import { fileName } from "../lib/video";
 import { useEditor } from "../store/editor";
 import { Menu, Tabs, toast } from "../ui";
@@ -49,6 +50,7 @@ export function Editor() {
     try {
       const saved = await saveProject(target, project);
       markSaved(saved);
+      void touchRecent(saved, project.video_path).catch(() => {});
       toast(`Saved ${fileName(saved)}`, "success");
     } catch (e) {
       toast(String(e), "error");
@@ -64,7 +66,7 @@ export function Editor() {
     });
     if (!chosen) return;
     try {
-      useEditor.getState().open(await loadProject(chosen), chosen);
+      await openProjectFile(chosen);
     } catch (e) {
       toast(String(e), "error");
     }

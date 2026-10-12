@@ -6,7 +6,7 @@ import {
   mergeWithNext,
   splitSegment,
 } from "../lib/captions";
-import { DEFAULT_STYLE } from "../lib/project";
+import { DEFAULT_STYLE } from "../lib/presets";
 import type { Transcript, WhisperModel } from "../lib/transcribe";
 import type { Project, Segment, Style } from "../lib/types";
 
