@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { loadProject } from "./lib/project";
 import { Editor } from "./components/Editor";
+import { CpuCheck } from "./components/CpuCheck";
 import { Home } from "./components/Home";
 import { useEditor } from "./store/editor";
 import { ToastRegion } from "./ui";
@@ -23,6 +24,7 @@ function App() {
     <>
       {hasProject ? <Editor /> : <Home />}
       <ToastRegion />
+      <CpuCheck />
     </>
   );
 }

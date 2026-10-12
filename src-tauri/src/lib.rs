@@ -1,6 +1,7 @@
 mod ass;
 mod audio;
 mod burn;
+mod cpu;
 mod ffmpeg;
 mod layout;
 mod model;
@@ -129,6 +130,10 @@ async fn transcribe(
     custom_words: Option<String>,
     on_progress: Channel<TranscribeProgress>,
 ) -> Result<Transcript, String> {
+    let support = cpu::check();
+    if !support.supported {
+        return Err(cpu::unsupported_message(&support.missing));
+    }
     let model_path = model.path_in(&models_dir(&app)?);
     if !model.is_downloaded(model_path.parent().unwrap()) {
         return Err(format!("model {} is not downloaded", model.file_name()));
@@ -339,6 +344,17 @@ fn allow_dropped_video(app: AppHandle, path: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// Whether this CPU can run transcription (see cpu.rs).
+#[tauri::command]
+fn cpu_support() -> cpu::CpuSupport {
+    cpu::check()
+}
+
+#[tauri::command]
+fn quit_app(app: AppHandle) {
+    app.exit(0);
+}
+
 /// Development aid: a project to open at startup, from `KREOKIT_DEV_OPEN`. Always `None`
 /// in release builds.
 #[tauri::command]
@@ -372,7 +388,9 @@ pub fn run() {
             touch_recent,
             remove_recent,
             video_thumbnail,
-            allow_dropped_video
+            allow_dropped_video,
+            cpu_support,
+            quit_app
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

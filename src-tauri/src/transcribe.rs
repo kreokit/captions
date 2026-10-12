@@ -2,7 +2,11 @@
 //!
 //! Runs on the CPU. ggml's Metal backend needs simdgroup support (Apple7 GPU family or
 //! Metal 3) for its fast paths, which Intel Macs on macOS 12 lack, so Metal would mostly fall
-//! back to the CPU anyway. TODO: enable the `metal` feature for Apple Silicon builds.
+//! back to the CPU anyway.
+//!
+//! TODO(metal): the v0.1 alpha is CPU-only on every platform. Enable whisper-rs's `metal`
+//! feature (and `use_gpu`) for aarch64-apple-darwin once it can be tested on an Apple
+//! Silicon Mac; it should make transcription several times faster there.
 
 use std::path::Path;
 use std::sync::Arc;
