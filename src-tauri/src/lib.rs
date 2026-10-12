@@ -133,9 +133,15 @@ async fn save_project(path: String, project: Project) -> Result<String, String> 
     .await
 }
 
+/// Loads a project and lets the webview play its video (the asset protocol only serves
+/// files the user picked or opened).
 #[tauri::command]
-async fn load_project(path: String) -> Result<Project, String> {
-    blocking(move || project::load(&PathBuf::from(path))).await
+async fn load_project(app: AppHandle, path: String) -> Result<Project, String> {
+    let project = blocking(move || project::load(&PathBuf::from(path))).await?;
+    app.asset_protocol_scope()
+        .allow_file(&project.video_path)
+        .map_err(|e| e.to_string())?;
+    Ok(project)
 }
 
 #[tauri::command]

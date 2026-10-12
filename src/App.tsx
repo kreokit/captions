@@ -8,7 +8,10 @@ import {
   formatFps,
   probeVideo,
 } from "./lib/video";
+import { PROJECT_EXTENSION, loadProject } from "./lib/project";
+import { Editor } from "./components/Editor";
 import { TranscribePanel } from "./components/TranscribePanel";
+import { useEditor } from "./store/editor";
 import "./App.css";
 
 type ProbeState =
@@ -18,7 +21,27 @@ type ProbeState =
   | { status: "error"; path: string; message: string };
 
 function App() {
+  const hasProject = useEditor((s) => s.project !== null);
+  return hasProject ? <Editor /> : <Home />;
+}
+
+function Home() {
   const [probe, setProbe] = useState<ProbeState>({ status: "idle" });
+  const [openError, setOpenError] = useState<string | null>(null);
+
+  async function openProject() {
+    const path = await open({
+      multiple: false,
+      directory: false,
+      filters: [{ name: "KreoKit Captions project", extensions: [PROJECT_EXTENSION] }],
+    });
+    if (!path) return;
+    try {
+      useEditor.getState().open(await loadProject(path), path);
+    } catch (e) {
+      setOpenError(String(e));
+    }
+  }
 
   async function chooseVideo() {
     const path = await open({
@@ -52,7 +75,11 @@ function App() {
         >
           Choose video
         </button>
+        <button type="button" className="secondary" onClick={openProject}>
+          Open project…
+        </button>
         <p className="hint">MP4, MOV, MKV, WebM or AVI. Nothing leaves your computer.</p>
+        {openError && <p className="error">{openError}</p>}
       </section>
 
       {probe.status !== "idle" && (

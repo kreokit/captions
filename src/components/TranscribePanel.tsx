@@ -5,7 +5,6 @@ import {
   LANGUAGES,
   MODEL_LABELS,
   ModelInfo,
-  Transcript,
   WhisperModel,
   cancelTranscription,
   describeProgress,
@@ -14,12 +13,11 @@ import {
   listModels,
   transcribe,
 } from "../lib/transcribe";
-import { formatDuration } from "../lib/video";
+import { projectFromTranscript, useEditor } from "../store/editor";
 
 type RunState =
   | { status: "idle" }
   | { status: "running"; label: string; percent: number | null }
-  | { status: "done"; transcript: Transcript }
   | { status: "error"; message: string };
 
 export function TranscribePanel({ videoPath }: { videoPath: string }) {
@@ -66,7 +64,9 @@ export function TranscribePanel({ videoPath }: { videoPath: string }) {
       const transcript = await transcribe(videoPath, language, model, hideNonSpeech, (p) =>
         update({ status: "running", ...describeProgress(p) }),
       );
-      update({ status: "done", transcript });
+      if (runId.current === id) {
+        useEditor.getState().open(projectFromTranscript(videoPath, transcript, model), null);
+      }
     } catch (e) {
       update(
         String(e) === CANCELLED ? { status: "idle" } : { status: "error", message: String(e) },
@@ -132,23 +132,6 @@ export function TranscribePanel({ videoPath }: { videoPath: string }) {
 
       {run.status === "error" && <p className="error">{run.message}</p>}
 
-      {run.status === "done" && (
-        <div className="transcript">
-          <p className="hint">
-            {run.transcript.segments.length} segments · language: {run.transcript.language}
-          </p>
-          <ol>
-            {run.transcript.segments.map((s) => (
-              <li key={s.id}>
-                <time>
-                  {formatDuration(s.start_ms)} – {formatDuration(s.end_ms)}
-                </time>
-                <span>{s.text}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
     </section>
   );
 }

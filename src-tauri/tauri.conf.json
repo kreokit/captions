@@ -13,14 +13,18 @@
     "windows": [
       {
         "title": "KreoKit Captions",
-        "width": 960,
-        "height": 640,
-        "minWidth": 640,
-        "minHeight": 480
+        "width": 1200,
+        "height": 780,
+        "minWidth": 720,
+        "minHeight": 520
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": []
+      }
     }
   },
   "bundle": {

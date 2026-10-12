@@ -33,6 +33,9 @@ interface EditorState {
   dirty: boolean;
   /** Playback position of the video. */
   currentMs: number;
+  /** Moves the video to `ms`; provided by the mounted player. */
+  seek(ms: number): void;
+  setSeekHandler(handler: (ms: number) => void): void;
 
   open(project: Project, path: string | null): void;
   close(): void;
@@ -61,6 +64,8 @@ export const useEditor = create<EditorState>()((set, get) => {
     path: null,
     dirty: false,
     currentMs: 0,
+    seek: () => {},
+    setSeekHandler: (seek) => set({ seek }),
 
     open: (project, path) => set({ project, path, dirty: path === null, currentMs: 0 }),
     close: () => set({ project: null, path: null, dirty: false, currentMs: 0 }),
