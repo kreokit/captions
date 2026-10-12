@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/brand/kreokit-logo-wide.png" alt="KreoKit" width="420">
+</p>
+
 # KreoKit Captions
 
 **Free, offline auto-captions for your videos.** Drop in a video, get accurate captions in seconds, style them, and export, with no watermark, no account and no upload.
