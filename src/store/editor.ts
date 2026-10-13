@@ -41,6 +41,9 @@ interface EditorState {
   /** Caption selected in the list / timeline (keyboard actions apply to it). */
   selected: number | null;
   select(index: number | null): void;
+  /** The inspector tab showing (the video shows a draggable ghost caption on Style). */
+  inspectorTab: "captions" | "style";
+  setInspectorTab(tab: "captions" | "style"): void;
   /** The video's pixel size, once the player has loaded it. */
   videoSize: { width: number; height: number } | null;
   setVideoSize(size: { width: number; height: number }): void;
@@ -91,6 +94,8 @@ export const useEditor = create<EditorState>()((set, get) => {
     replaceSegments: (segments) => edit(() => segments),
     selected: null,
     select: (selected) => set({ selected }),
+    inspectorTab: "captions",
+    setInspectorTab: (inspectorTab) => set({ inspectorTab }),
     videoSize: null,
     setVideoSize: (videoSize) => set({ videoSize }),
     durationMs: 0,

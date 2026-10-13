@@ -101,3 +101,22 @@ export function outlineShadow(radius: number, color: string): string | undefined
   }
   return shadows.join(", ");
 }
+
+/**
+ * The caption nearest in time to `ms` (its first moment), for showing a dimmed "ghost"
+ * that can still be dragged when no caption is on screen. Null without captions.
+ */
+export function ghostFrame(segments: Segment[], ms: number, style: Style): OverlayFrame | null {
+  let best: Segment | null = null;
+  let bestDistance = Infinity;
+  for (const s of segments) {
+    const d = ms < s.start_ms ? s.start_ms - ms : ms >= s.end_ms ? ms - s.end_ms : 0;
+    if (d < bestDistance) {
+      best = s;
+      bestDistance = d;
+    }
+  }
+  if (!best) return null;
+  const frame = overlayFrame(segments, best.start_ms, style);
+  return frame && { ...frame, key: `ghost:${frame.key}` };
+}

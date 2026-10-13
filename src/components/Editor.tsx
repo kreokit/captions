@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { confirm, open as openDialog, save } from "@tauri-apps/plugin-dialog";
 import { Bug, Ellipsis, FolderOpen, House, Save } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
@@ -18,7 +18,6 @@ import "../styles/captions.css";
 import "../styles/style-panel.css";
 import "../styles/timeline.css";
 
-type Tab = "captions" | "style";
 
 /** Asks before throwing away unsaved edits. True when it's fine to continue. */
 async function okToDiscard(): Promise<boolean> {
@@ -35,7 +34,8 @@ export function Editor() {
   const project = useEditor((s) => s.project);
   const path = useEditor((s) => s.path);
   const dirty = useEditor((s) => s.dirty);
-  const [tab, setTab] = useState<Tab>("captions");
+  const tab = useEditor((s) => s.inspectorTab);
+  const setTab = useEditor((s) => s.setInspectorTab);
 
   const saveTo = useCallback(async (saveAs: boolean) => {
     const { project, path, markSaved } = useEditor.getState();

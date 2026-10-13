@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 import shared from "../../fixtures/position-cases.json";
 import { DEFAULT_STYLE } from "./presets";
-import { anchorForY, anchorPoint, captionExtents, fitAnchor, fittedStyle, placement, playResX } from "./position";
+import {
+  anchorForY,
+  anchorPoint,
+  captionExtents,
+  dragAnchor,
+  fitAnchor,
+  fittedStyle,
+  placement,
+  playResX,
+} from "./position";
 import type { Style } from "./types";
 
 describe("placement (shared cases with ass.rs)", () => {
@@ -78,5 +87,40 @@ describe("keeping captions inside the frame", () => {
     expect(fitAnchor(placed, { width: 100, height: 60 }, 1920)).toEqual({ x: 0.3, y: 0.8 });
     expect(fitAnchor(placed, { width: 5000, height: 60 }, 1920).x).toBe(0.5);
     expect(fittedStyle(placed, { width: 100, height: 60 }, 1920)).toMatchObject({ pos_x: 0.3, pos_y: 0.8 });
+  });
+});
+
+describe("dragging a caption", () => {
+  const box = { w: 0.4, h: 0.1 };
+  const bottom = { x: 0.5, y: 1 - 86 / 1080, position: "bottom" as const };
+  const snap = { x: 0.01, y: 0.01 };
+  const near = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+
+  it("moves with the pointer and re-anchors by thirds without jumping", () => {
+    const moved = dragAnchor(bottom, -0.2, -0.5, box, null);
+    // Centre was at bottom - h/2; moved up by 0.5 into the middle third.
+    expect(moved.position).toBe("middle");
+    expect(near(moved.x, 0.3)).toBe(true);
+    expect(near(moved.y, 1 - 86 / 1080 - 0.05 - 0.5)).toBe(true);
+    const top = dragAnchor(bottom, 0, -0.75, box, null);
+    expect(top.position).toBe("top");
+    // Top anchor = centre - h/2.
+    expect(near(top.y, 1 - 86 / 1080 - 0.05 - 0.75 - 0.05)).toBe(true);
+  });
+
+  it("snaps to the centres and the old Top / Bottom spots, with guides", () => {
+    const centred = dragAnchor({ x: 0.3, y: 0.5, position: "middle" }, 0.195, 0.004, box, snap);
+    expect(centred).toMatchObject({ x: 0.5, y: 0.5, position: "middle", guides: { vertical: 0.5, horizontal: 0.5 } });
+    // Bottom edge lands 0.005 above the Bottom spot: snaps onto it.
+    const nearBottom = dragAnchor(bottom, 0, -0.005, box, snap);
+    expect(near(nearBottom.y, 1 - 86 / 1080)).toBe(true);
+    expect(nearBottom.guides.horizontal).toBeCloseTo(1 - 86 / 1080);
+  });
+
+  it("does not snap with snapping off, and keeps the box inside the frame", () => {
+    expect(dragAnchor({ x: 0.3, y: 0.5, position: "middle" }, 0.195, 0, box, null).x).toBeCloseTo(0.495);
+    const corner = dragAnchor(bottom, 2, 2, box, null);
+    expect(corner.x).toBeCloseTo(0.8); // 1 - w/2
+    expect(corner.y).toBeCloseTo(1); // bottom edge on the frame edge
   });
 });

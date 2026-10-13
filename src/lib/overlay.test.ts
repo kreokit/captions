@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayText, outlineShadow, overlayFrame } from "./overlay";
+import { displayText, ghostFrame, outlineShadow, overlayFrame } from "./overlay";
 import { DEFAULT_STYLE } from "./presets";
 import type { CaptionMode, Segment, Style } from "./types";
 
@@ -89,5 +89,22 @@ describe("outlineShadow", () => {
     const shadows = outlineShadow(6, "#112233")!.split(", ");
     expect(shadows).toHaveLength(38 + 19); // ceil(2π·6) + ceil(2π·3)
     expect(outlineShadow(40, "#000000")!.split(", ")).toHaveLength(48 + 48);
+  });
+});
+
+describe("ghostFrame", () => {
+  const two: Segment[] = [segments[0], { ...segments[0], id: 1, start_ms: 5000, end_ms: 6000, text: "Later", words: [{ start_ms: 5000, end_ms: 6000, text: "Later" }] }];
+  const s = style("line");
+  const text = (ms: number) => ghostFrame(two, ms, s)?.lines.map((l) => l.map((w) => w.text).join(" ")).join(" / ");
+
+  it("shows the caption nearest in time", () => {
+    expect(text(0)).toBe("Hello there / friend");
+    expect(text(3000)).toBe("Hello there / friend"); // 500 ms after the first, 2000 before the second
+    expect(text(4800)).toBe("Later");
+    expect(text(9000)).toBe("Later");
+  });
+
+  it("has nothing to show without captions", () => {
+    expect(ghostFrame([], 0, s)).toBeNull();
   });
 });

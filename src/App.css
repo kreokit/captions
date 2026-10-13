@@ -45,3 +45,66 @@
     scale: 1;
   }
 }
+
+/* Dragging captions on the video */
+
+.overlay.draggable {
+  pointer-events: auto;
+  cursor: grab;
+  outline-offset: 6px;
+  touch-action: none;
+}
+
+.overlay.draggable:hover {
+  outline: 1px solid rgb(255 255 255 / 0.6);
+}
+
+.overlay.dragging,
+.overlay.dragging:hover {
+  cursor: grabbing;
+  outline: 1px solid var(--color-accent);
+}
+
+.overlay.ghost {
+  opacity: 0.45;
+}
+
+.overlay-grip {
+  position: absolute;
+  left: 50%;
+  top: -30px;
+  transform: translateX(-50%);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 16px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  line-height: 0;
+}
+
+.overlay.draggable:hover .overlay-grip,
+.overlay.dragging .overlay-grip {
+  display: flex;
+}
+
+.caption-guide {
+  position: absolute;
+  z-index: 1;
+  background: var(--color-accent);
+  pointer-events: none;
+}
+
+.caption-guide-v {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+.caption-guide-h {
+  left: 0;
+  right: 0;
+  height: 1px;
+}

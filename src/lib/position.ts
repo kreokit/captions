@@ -115,3 +115,68 @@ export function fittedStyle(style: Style, extents: Extents, playRes: number): St
   const { x, y } = fitAnchor(style, extents, playRes);
   return { ...style, pos_x: x, pos_y: y };
 }
+
+/** An anchor in fractions of the frame, with the edge it marks. */
+export interface Anchor {
+  x: number;
+  y: number;
+  position: Position;
+}
+
+/** Guide lines to draw while snapped, as fractions of the frame. */
+export interface Guides {
+  vertical?: number;
+  horizontal?: number;
+}
+
+/** Vertical offset from the anchor to the box centre, for a box `h` tall. */
+const centreOffset = (position: Position, h: number) =>
+  position === "top" ? h / 2 : position === "bottom" ? -h / 2 : 0;
+
+/**
+ * Where a caption dragged by (dx, dy) ends up. Everything is in fractions of the frame;
+ * `box` is the caption's size. The box centre moves with the pointer, snaps (within
+ * `snap.x` / `snap.y`, null to turn snapping off) to the horizontal and vertical centre
+ * and its edges to the Top / Bottom preset spots, and stays inside the frame. The anchor
+ * edge follows the thirds of the frame (anchorForY).
+ */
+export function dragAnchor(
+  start: Anchor,
+  dx: number,
+  dy: number,
+  box: { w: number; h: number },
+  snap: { x: number; y: number } | null,
+): Anchor & { guides: Guides } {
+  let cx = start.x + dx;
+  let cy = start.y + centreOffset(start.position, box.h) + dy;
+  const guides: Guides = {};
+
+  if (snap) {
+    if (Math.abs(cx - 0.5) <= snap.x) {
+      cx = 0.5;
+      guides.vertical = 0.5;
+    }
+    // Candidates: centre on the middle, top edge on the Top spot, bottom edge on Bottom.
+    const candidates = [
+      { centre: 0.5, line: 0.5 },
+      { centre: PRESET_Y.top + box.h / 2, line: PRESET_Y.top },
+      { centre: PRESET_Y.bottom - box.h / 2, line: PRESET_Y.bottom },
+    ];
+    let best: (typeof candidates)[number] | null = null;
+    for (const c of candidates) {
+      const d = Math.abs(cy - c.centre);
+      if (d <= snap.y && (!best || d < Math.abs(cy - best.centre))) best = c;
+    }
+    if (best) {
+      cy = best.centre;
+      guides.horizontal = best.line;
+    }
+  }
+
+  const halfW = Math.min(box.w, 1) / 2;
+  const halfH = Math.min(box.h, 1) / 2;
+  cx = Math.min(Math.max(cx, halfW), 1 - halfW);
+  cy = Math.min(Math.max(cy, halfH), 1 - halfH);
+  const position = anchorForY(cy);
+  return { x: cx, y: cy - centreOffset(position, box.h), position, guides };
+}
