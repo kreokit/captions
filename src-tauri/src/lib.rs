@@ -427,6 +427,5 @@ mod tests {
                 env!("CARGO_PKG_VERSION")
             )
         );
-        assert!(super::report_problem_url().contains("version=0.1.0"));
     }
 }
