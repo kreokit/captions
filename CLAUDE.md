@@ -2,7 +2,7 @@
 
 Read this before every task. It is the source of truth for scope and architecture.
 
-**Status (2026-10-13):** Milestones 1–6 and the UI redesign are done. v0.1.0-alpha is published as a pre-release: <https://github.com/kreokit/captions/releases/tag/v0.1.0-alpha>. Next work comes from the backlog and tester feedback (issues).
+**Status (2026-10-13):** Milestones 1–6 and the UI redesign are done. v0.1.1-alpha (free caption positioning) is published as a pre-release: <https://github.com/kreokit/captions/releases/tag/v0.1.1-alpha>. Next work comes from the backlog and tester feedback (issues).
 
 ## What we are building
 
