@@ -62,6 +62,12 @@ pub struct Style {
     pub bold: bool,
     pub uppercase: bool,
     pub animation: Animation,
+    /// Free position: the caption's anchor as a fraction of the frame width (0–1).
+    /// `None` (older projects, presets) means the preset spot for `position`.
+    pub pos_x: Option<f64>,
+    /// Free position, fraction of the frame height (0–1). Which edge of the caption
+    /// sits there depends on `position` (top edge, centre or bottom edge).
+    pub pos_y: Option<f64>,
 }
 
 impl Default for Style {
@@ -80,7 +86,30 @@ impl Default for Style {
             bold: true,
             uppercase: true,
             animation: Animation::None,
+            pos_x: None,
+            pos_y: None,
         }
+    }
+}
+
+/// Distance of the Top / Bottom preset spots from the frame edge: 86 px of a 1080 px
+/// frame (8%), as before free positioning.
+pub const PRESET_MARGIN: f64 = 86.0 / 1080.0;
+
+impl Style {
+    /// The caption's anchor point as fractions of the frame (0–1 each). Horizontally it is
+    /// the centre of the text; vertically the top edge, centre or bottom edge for
+    /// `position` top / middle / bottom.
+    pub fn anchor(&self) -> (f64, f64) {
+        let preset_y = match self.position {
+            Position::Top => PRESET_MARGIN,
+            Position::Middle => 0.5,
+            Position::Bottom => 1.0 - PRESET_MARGIN,
+        };
+        (
+            self.pos_x.unwrap_or(0.5).clamp(0.0, 1.0),
+            self.pos_y.unwrap_or(preset_y).clamp(0.0, 1.0),
+        )
     }
 }
 

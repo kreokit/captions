@@ -19,15 +19,16 @@ const POP_MS: u32 = 120;
 
 /// Builds the ASS script for a `width`×`height` video.
 pub fn to_ass(segments: &[Segment], style: &Style, width: u32, height: u32) -> String {
-    let play_res_x = (REFERENCE_HEIGHT as f64 * width as f64 / height.max(1) as f64)
-        .round()
-        .max(1.0) as u32;
+    let play_res_x = play_res_x(width, height);
     let mut out = header(style, play_res_x);
+    let (an, x, y) = placement(style, play_res_x);
+    // Every event pins the caption's anchor to the style's position.
+    let place = format!("{{\\an{an}\\pos({x},{y})}}");
     for segment in segments {
         for event in events(segment, style) {
             writeln!(
                 out,
-                "Dialogue: 0,{},{},Default,,0,0,0,,{}",
+                "Dialogue: 0,{},{},Default,,0,0,0,,{place}{}",
                 ass_time(event.start_ms),
                 ass_time(event.end_ms),
                 event.text
@@ -36,6 +37,30 @@ pub fn to_ass(segments: &[Segment], style: &Style, width: u32, height: u32) -> S
         }
     }
     out
+}
+
+/// The script width: 1080 high, as wide as the video's shape.
+pub fn play_res_x(width: u32, height: u32) -> u32 {
+    (REFERENCE_HEIGHT as f64 * width as f64 / height.max(1) as f64)
+        .round()
+        .max(1.0) as u32
+}
+
+/// ASS alignment (8 top / 5 middle / 2 bottom, horizontally centred) and the anchor in
+/// script coordinates, rounded to whole pixels. The preview places captions with the
+/// same numbers (src/lib/position.ts; shared cases in fixtures/position-cases.json).
+pub fn placement(style: &Style, play_res_x: u32) -> (u8, i64, i64) {
+    let an = match style.position {
+        Position::Top => 8,
+        Position::Middle => 5,
+        Position::Bottom => 2,
+    };
+    let (x, y) = style.anchor();
+    (
+        an,
+        (x * play_res_x as f64).round() as i64,
+        (y * REFERENCE_HEIGHT as f64).round() as i64,
+    )
 }
 
 fn header(style: &Style, play_res_x: u32) -> String {
@@ -283,8 +308,63 @@ mod tests {
         }
     }
 
-    fn dialogue(ass: &str) -> Vec<&str> {
-        ass.lines().filter(|l| l.starts_with("Dialogue:")).collect()
+    /// Dialogue lines without the leading placement block (tested separately).
+    fn dialogue(ass: &str) -> Vec<String> {
+        ass.lines()
+            .filter(|l| l.starts_with("Dialogue:"))
+            .map(|l| {
+                let start = l.find("{\\an").expect("placement block");
+                let end = start + l[start..].find('}').unwrap() + 1;
+                format!("{}{}", &l[..start], &l[end..])
+            })
+            .collect()
+    }
+
+    #[test]
+    fn every_event_is_placed() {
+        let ass = to_ass(&[hello()], &style(CaptionMode::WordHighlight), 1080, 1920);
+        let lines: Vec<&str> = ass.lines().filter(|l| l.starts_with("Dialogue:")).collect();
+        assert_eq!(lines.len(), 5);
+        assert!(
+            lines.iter().all(|l| l.contains(",,{\\an2\\pos(304,994)}")),
+            "{lines:?}"
+        );
+    }
+
+    #[test]
+    fn matches_shared_position_cases() {
+        use serde::Deserialize;
+        #[derive(Deserialize)]
+        struct Cases {
+            cases: Vec<Case>,
+        }
+        #[derive(Deserialize)]
+        struct Case {
+            name: String,
+            style: serde_json::Value,
+            frame: Frame,
+            play_res_x: u32,
+            an: u8,
+            pos: (i64, i64),
+        }
+        #[derive(Deserialize)]
+        struct Frame {
+            width: u32,
+            height: u32,
+        }
+        let cases: Cases =
+            serde_json::from_str(include_str!("../../fixtures/position-cases.json")).unwrap();
+        for case in cases.cases {
+            let style: Style = serde_json::from_value(case.style).unwrap();
+            let res_x = play_res_x(case.frame.width, case.frame.height);
+            assert_eq!(res_x, case.play_res_x, "{}", case.name);
+            assert_eq!(
+                placement(&style, res_x),
+                (case.an, case.pos.0, case.pos.1),
+                "{}",
+                case.name
+            );
+        }
     }
 
     #[test]

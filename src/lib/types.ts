@@ -34,6 +34,11 @@ export interface Style {
   bold: boolean;
   uppercase: boolean;
   animation: Animation;
+  /** Free position: the caption's anchor as fractions of the frame (0–1); null means the
+   * preset spot for `position`, which also says which edge is the anchor
+   * (top edge / centre / bottom edge). See src/lib/position.ts. */
+  pos_x: number | null;
+  pos_y: number | null;
 }
 
 /** A `.kreocap` project file. Mirrors `Project` in src-tauri/src/model.rs. */
