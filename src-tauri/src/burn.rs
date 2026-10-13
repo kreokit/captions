@@ -415,4 +415,128 @@ mod tests {
         assert!(lime > 150, "highlighted word not visible");
         let _ = std::fs::remove_file(&output);
     }
+
+    /// Burns a caption at free positions into 9:16 and 16:9 clips and checks where the
+    /// text lands in the video: horizontally centred on the anchor, vertically with the
+    /// anchored edge (top / centre / bottom) at the anchor, as the preview places it.
+    /// Needs ffmpeg and ffprobe: `cargo test burned_position -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn burned_position_matches_placement() {
+        use crate::model::{CaptionMode, Position, Segment, Style, Word};
+        let ffmpeg = ffmpeg::locate("ffmpeg").unwrap();
+        let fonts = Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/fonts");
+        let cases = [
+            (1080u32, 1920u32, Position::Top, 0.3, 0.2),
+            (1920, 1080, Position::Bottom, 0.7, 0.85),
+            (1080, 1920, Position::Middle, 0.5, 0.5),
+        ];
+        for (width, height, position, pos_x, pos_y) in cases {
+            let dir = std::env::temp_dir().join(format!("kreokit-place-{width}x{height}"));
+            let _ = std::fs::remove_dir_all(&dir);
+            std::fs::create_dir_all(&dir).unwrap();
+            let clip = dir.join("black.mp4");
+            assert!(
+                Command::new(&ffmpeg)
+                    .args(["-nostdin", "-y", "-v", "error", "-f", "lavfi", "-i"])
+                    .arg(format!("color=c=black:s={width}x{height}:r=25:d=1"))
+                    .args(["-pix_fmt", "yuv420p"])
+                    .arg(&clip)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+            let style = Style {
+                font_family: "Montserrat".into(),
+                font_size: 80,
+                color: "#FFFFFF".into(),
+                outline_width: 0,
+                mode: CaptionMode::Line,
+                uppercase: false,
+                position,
+                pos_x: Some(pos_x),
+                pos_y: Some(pos_y),
+                ..Style::default()
+            };
+            let segment = Segment {
+                id: 0,
+                start_ms: 0,
+                end_ms: 1000,
+                text: "MARK".into(),
+                words: vec![Word {
+                    start_ms: 0,
+                    end_ms: 1000,
+                    text: "MARK".into(),
+                }],
+            };
+            let ass = crate::ass::to_ass(&[segment], &style, width, height);
+            let out = dir.join("out.mp4");
+            burn_in(
+                &clip,
+                &out,
+                &ass,
+                Some(&fonts),
+                1000,
+                &AtomicBool::new(false),
+                |_| {},
+            )
+            .unwrap();
+
+            let raw = Command::new(&ffmpeg)
+                .args(["-nostdin", "-v", "error", "-ss", "0.5", "-i"])
+                .arg(&out)
+                .args([
+                    "-frames:v",
+                    "1",
+                    "-f",
+                    "rawvideo",
+                    "-pix_fmt",
+                    "gray",
+                    "pipe:1",
+                ])
+                .output()
+                .unwrap()
+                .stdout;
+            assert_eq!(raw.len(), (width * height) as usize);
+            let (mut left, mut right, mut top, mut bottom) = (u32::MAX, 0, u32::MAX, 0);
+            for (i, &v) in raw.iter().enumerate() {
+                if v > 128 {
+                    let (x, y) = (i as u32 % width, i as u32 / width);
+                    left = left.min(x);
+                    right = right.max(x);
+                    top = top.min(y);
+                    bottom = bottom.max(y);
+                }
+            }
+            assert!(
+                right > left,
+                "no caption found in the {width}x{height} frame"
+            );
+
+            let anchor_x = pos_x * width as f64;
+            let anchor_y = pos_y * height as f64;
+            let font_px = 80.0 * height as f64 / 1080.0;
+            let centre_x = (left + right) as f64 / 2.0;
+            let edge_y = match position {
+                Position::Top => top as f64,
+                Position::Middle => (top + bottom) as f64 / 2.0,
+                Position::Bottom => bottom as f64,
+            };
+            println!(
+                "{width}x{height} {position:?}: anchor ({anchor_x:.0}, {anchor_y:.0}), text box x {left}-{right}, y {top}-{bottom}"
+            );
+            assert!(
+                (centre_x - anchor_x).abs() <= width as f64 * 0.02,
+                "{width}x{height}: text centred at x {centre_x}, anchor {anchor_x}"
+            );
+            // The glyphs sit inside the font's line box (ascender / descender space, e.g.
+            // ~0.27 of the size above Montserrat's capitals), so the anchored edge of the
+            // ink is within 30 % of the font size of the anchor. A misplaced caption would be
+            // hundreds of pixels off.
+            assert!(
+                (edge_y - anchor_y).abs() <= font_px * 0.3,
+                "{width}x{height} {position:?}: text edge at y {edge_y}, anchor {anchor_y}"
+            );
+        }
+    }
 }
