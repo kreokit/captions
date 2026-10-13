@@ -6,9 +6,8 @@
      stylistic sets (base.css) must not leak in. */
   font-feature-settings: normal;
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
   text-align: center;
+  white-space: nowrap;
   pointer-events: none;
 }
 
@@ -16,22 +15,26 @@
   white-space: pre;
 }
 
+/* The caption's anchor is placed with left/top (placement in position.ts); shift the box
+   so the anchor is its top-centre, centre or bottom-centre, like ASS \an8 / 5 / 2. */
+.overlay-top {
+  transform: translate(-50%, 0);
+  transform-origin: 50% 0;
+}
+
 .overlay-middle {
-  top: 50%;
   transform: translate(-50%, -50%);
+  transform-origin: 50% 50%;
+}
+
+.overlay-bottom {
+  transform: translate(-50%, -100%);
+  transform-origin: 50% 100%;
 }
 
 /* Pop: scale up from the caption's anchor, like \fscx/\fscy with \t in ASS. */
 .overlay.pop {
   animation: overlay-pop var(--pop-ms) linear both;
-}
-
-.overlay-bottom.pop {
-  transform-origin: 50% 100%;
-}
-
-.overlay-top.pop {
-  transform-origin: 50% 0;
 }
 
 @keyframes overlay-pop {

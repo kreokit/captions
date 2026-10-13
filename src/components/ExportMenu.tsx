@@ -10,6 +10,7 @@ import {
 } from "../lib/export";
 import { CANCELLED, cancelTranscription } from "../lib/transcribe";
 import { fileName } from "../lib/video";
+import { fitStyle } from "../lib/textMetrics";
 import { useEditor } from "../store/editor";
 import { Button, Dialog, Menu, MenuEntry, ProgressBar, toast } from "../ui";
 
@@ -30,7 +31,9 @@ export function ExportMenu() {
     if (!path) return;
     setBusy(true);
     try {
-      const written = await exportSubtitles(path, format, project.video_path, project.segments, project.style);
+      // The position fitted inside the frame, exactly as the preview shows it.
+      const style = fitStyle(project.segments, project.style, useEditor.getState().videoSize);
+      const written = await exportSubtitles(path, format, project.video_path, project.segments, style);
       toast(`Exported ${fileName(written)}`, "success");
     } catch (e) {
       toast(String(e), "error");
@@ -50,7 +53,8 @@ export function ExportMenu() {
     setBusy(true);
     setVideoProgress(0);
     try {
-      const written = await exportVideo(project.video_path, path, project.segments, project.style, setVideoProgress);
+      const style = fitStyle(project.segments, project.style, useEditor.getState().videoSize);
+      const written = await exportVideo(project.video_path, path, project.segments, style, setVideoProgress);
       toast(`Exported ${fileName(written)}`, "success");
     } catch (e) {
       toast(String(e) === CANCELLED ? "Export cancelled" : String(e), String(e) === CANCELLED ? "info" : "error");

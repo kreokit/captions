@@ -41,6 +41,9 @@ interface EditorState {
   /** Caption selected in the list / timeline (keyboard actions apply to it). */
   selected: number | null;
   select(index: number | null): void;
+  /** The video's pixel size, once the player has loaded it. */
+  videoSize: { width: number; height: number } | null;
+  setVideoSize(size: { width: number; height: number }): void;
   /** Length of the video, once the player has loaded it (0 before). */
   durationMs: number;
   setDurationMs(ms: number): void;
@@ -88,13 +91,15 @@ export const useEditor = create<EditorState>()((set, get) => {
     replaceSegments: (segments) => edit(() => segments),
     selected: null,
     select: (selected) => set({ selected }),
+    videoSize: null,
+    setVideoSize: (videoSize) => set({ videoSize }),
     durationMs: 0,
     setDurationMs: (durationMs) => set({ durationMs }),
     seek: () => {},
     setSeekHandler: (seek) => set({ seek }),
 
     open: (project, path) =>
-      set({ project, path, dirty: path === null, currentMs: 0, durationMs: 0, selected: null }),
+      set({ project, path, dirty: path === null, currentMs: 0, durationMs: 0, selected: null, videoSize: null }),
     close: () =>
       set({ project: null, path: null, dirty: false, currentMs: 0, durationMs: 0, selected: null }),
     setCurrentMs: (currentMs) => set({ currentMs }),

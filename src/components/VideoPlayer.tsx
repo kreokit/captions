@@ -1,13 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import {
-  MARGIN_V,
-  POP_MS,
-  POP_SCALE,
-  REFERENCE_HEIGHT,
-  outlineShadow,
-  overlayFrame,
-} from "../lib/overlay";
+import { POP_MS, POP_SCALE, REFERENCE_HEIGHT, outlineShadow, overlayFrame } from "../lib/overlay";
+import { placement, playResX } from "../lib/position";
+import { emPerFontSize, useFittedStyle } from "../lib/textMetrics";
 import { Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { nextCaptionStart, previousCaptionStart } from "../lib/captions";
 import { formatDuration } from "../lib/video";
@@ -26,6 +21,7 @@ export function VideoPlayer({ path }: { path: string }) {
   const [error, setError] = useState<string | null>(null);
   const setCurrentMs = useEditor((s) => s.setCurrentMs);
   const setDurationMs = useEditor((s) => s.setDurationMs);
+  const setVideoSize = useEditor((s) => s.setVideoSize);
   const setPlayingInStore = useEditor((s) => s.setPlaying);
   const setSeekHandler = useEditor((s) => s.setSeekHandler);
 
@@ -112,7 +108,10 @@ export function VideoPlayer({ path }: { path: string }) {
             onClick={togglePlay}
             onLoadedMetadata={(e) => {
               const { videoWidth, videoHeight, duration } = e.currentTarget;
-              if (videoWidth && videoHeight) setAspect(videoWidth / videoHeight);
+              if (videoWidth && videoHeight) {
+                setAspect(videoWidth / videoHeight);
+                setVideoSize({ width: videoWidth, height: videoHeight });
+              }
               if (Number.isFinite(duration)) setDurationMs(Math.round(duration * 1000));
               setError(null);
             }}
@@ -170,20 +169,22 @@ function PlayerControls({ playing, onTogglePlay }: { playing: boolean; onToggleP
 }
 
 function CaptionOverlay({ scale }: { scale: number }) {
-  useFontsLoaded();
   const segments = useEditor((s) => s.project?.segments ?? NO_SEGMENTS);
-  const style = useEditor((s) => s.project?.style);
+  const videoSize = useEditor((s) => s.videoSize);
+  const style = useFittedStyle(segments, useEditor((s) => s.project?.style), videoSize);
   const currentMs = useEditor((s) => s.currentMs);
-  if (!style) return null;
+  if (!style || !videoSize) return null;
   const frame = overlayFrame(segments, currentMs, style);
   if (!frame) return null;
 
+  // The same anchor, in script pixels, as the ASS export (placement in position.ts).
+  const place = placement(style, playResX(videoSize.width, videoSize.height));
   return (
     <div
       // A new key per caption restarts the pop animation, like a new ASS event.
       key={style.animation === "pop" ? frame.key : undefined}
       className={`overlay overlay-${style.position}${style.animation === "pop" ? " pop" : ""}`}
-      style={overlayStyle(style, scale)}
+      style={{ ...overlayStyle(style, scale), left: place.x * scale, top: place.y * scale }}
     >
       {frame.lines.map((line, l) => (
         <div key={l} className="overlay-line">
@@ -201,48 +202,9 @@ function CaptionOverlay({ scale }: { scale: number }) {
 
 const NO_SEGMENTS: Segment[] = [];
 
-/**
- * libass sizes text so that the font's ascender + descender equals the style's font
- * size (measured on a burned frame: Arial Bold at 200 gives a 128 px "H"), while CSS
- * sizes the em. Convert using the font's own metrics, measured once per font.
- */
-const sizeRatios = new Map<string, number>();
-function emPerFontSize(family: string, bold: boolean): number {
-  const font = `${bold ? 700 : 400} 100px "${family}"`;
-  const key = `${family}|${bold}`;
-  let ratio = sizeRatios.get(key);
-  if (ratio === undefined) {
-    // Bundled fonts load on first use; measuring before that would measure (and cache)
-    // the fallback font. Until then use a typical ratio; useFontsLoaded re-renders.
-    if (!document.fonts.check(font)) {
-      void document.fonts.load(font);
-      return 1 / 1.15;
-    }
-    const ctx = document.createElement("canvas").getContext("2d");
-    if (ctx) ctx.font = font;
-    const m = ctx?.measureText("H");
-    const height = m ? m.fontBoundingBoxAscent + m.fontBoundingBoxDescent : 0;
-    ratio = height > 0 ? 100 / height : 1 / 1.15;
-    sizeRatios.set(key, ratio);
-  }
-  return ratio;
-}
-
-/** Re-renders when web fonts finish loading (so caption metrics get re-measured). */
-function useFontsLoaded(): number {
-  const [generation, setGeneration] = useState(0);
-  useEffect(() => {
-    const bump = () => setGeneration((g) => g + 1);
-    document.fonts.addEventListener("loadingdone", bump);
-    return () => document.fonts.removeEventListener("loadingdone", bump);
-  }, []);
-  return generation;
-}
-
-/** Sizes and positions from the same reference values as the ASS export (ass.rs). */
+/** Font, size, colour and outline from the same reference values as the export. */
 function overlayStyle(style: Style, scale: number): React.CSSProperties {
   const size = style.font_size * scale;
-  const margin = `${MARGIN_V * scale}px`;
   return {
     fontFamily: `"${style.font_family}"`,
     fontWeight: style.bold ? 700 : 400,
@@ -252,8 +214,6 @@ function overlayStyle(style: Style, scale: number): React.CSSProperties {
     color: style.color,
     // Outline outside the fill with round corners, like libass (see outlineShadow).
     textShadow: outlineShadow(style.outline_width * scale, style.outline_color),
-    bottom: style.position === "bottom" ? margin : undefined,
-    top: style.position === "top" ? margin : undefined,
     ["--pop-from" as string]: POP_SCALE,
     ["--pop-ms" as string]: `${POP_MS}ms`,
   };

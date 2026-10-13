@@ -32,7 +32,8 @@ export function displayText(text: string): string {
   return text.replace(/[{}\\]/g, (c) => ({ "{": "｛", "}": "｝", "\\": "＼" })[c] ?? c);
 }
 
-function transformed(segment: Segment, style: Style): Segment {
+/** The segment's words as rendered: uppercase if the style says so, ASS-safe characters. */
+export function transformed(segment: Segment, style: Style): Segment {
   const t = (s: string) => displayText(style.uppercase ? s.toUpperCase() : s);
   return {
     ...segment,
