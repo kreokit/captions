@@ -126,3 +126,13 @@ export function normalizeHex(text: string): string | null {
   if (/^[0-9a-f]{6}$/i.test(hex)) return ("#" + hex).toUpperCase();
   return null;
 }
+
+/**
+ * A typed number for a field shown with one decimal ("12.5", "12,5 %"), clamped to
+ * [min, max]; null if it isn't a number.
+ */
+export function parseNumberField(text: string, min: number, max: number): number | null {
+  const n = Number.parseFloat(text.replace(",", ".").replace("%", "").trim());
+  if (!Number.isFinite(n)) return null;
+  return clamp(Math.round(n * 10) / 10, min, max);
+}

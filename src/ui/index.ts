@@ -8,6 +8,7 @@ export { Checkbox, Field, ProgressBar, SectionLabel, Segmented, Switch, Tabs, Te
 export type { SegmentOption } from "./controls";
 export { Dialog } from "./Dialog";
 export { Menu, useContextMenu } from "./Menu";
+export { NumberField } from "./NumberField";
 export type { MenuEntry } from "./Menu";
 export { Popover } from "./Popover";
 export { Select } from "./Select";

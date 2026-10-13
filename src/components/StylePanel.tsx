@@ -3,7 +3,13 @@ import { outlineShadow } from "../lib/overlay";
 import { FONTS, PRESETS, Preset, matchingPreset } from "../lib/presets";
 import type { CaptionMode, Position, Style } from "../lib/types";
 import { useEditor } from "../store/editor";
-import { ColorPicker, Field, SectionLabel, Segmented, Select, Slider, Switch } from "../ui";
+import { anchorForY, anchorPoint } from "../lib/position";
+import { isVertical } from "../lib/safeArea";
+import { useFittedStyle } from "../lib/textMetrics";
+import type { Segment } from "../lib/types";
+
+const NO_SEGMENTS: Segment[] = [];
+import { ColorPicker, Field, NumberField, SectionLabel, Segmented, Select, Slider, Switch } from "../ui";
 
 const MODES: { value: CaptionMode; label: string }[] = [
   { value: "line", label: "Line" },
@@ -27,6 +33,8 @@ const LINES = [
 export function StylePanel() {
   const style = useEditor((s) => s.project?.style);
   const setStyle = useEditor((s) => s.setStyle);
+  const segments = useEditor((s) => s.project?.segments ?? NO_SEGMENTS);
+  const fitted = useFittedStyle(segments, style, useEditor((s) => s.videoSize));
   if (!style) return null;
   const active = matchingPreset(style);
   const set = <K extends keyof Style>(key: K, value: Style[K]) => setStyle({ [key]: value });
@@ -53,6 +61,12 @@ export function StylePanel() {
           />
         </Field>
         <SliderField label="Size" value={style.font_size} min={24} max={160} onChange={(v) => set("font_size", v)} />
+        {fitted && fitted.font_size < style.font_size && (
+          <p className="style-hint">
+            Shrunk to {fitted.font_size} so the longest caption fits the frame. Fewer characters per line keeps
+            it bigger.
+          </p>
+        )}
         <Switch label="Bold" checked={style.bold} onChange={(v) => set("bold", v)} />
         <Switch label="Uppercase" checked={style.uppercase} onChange={(v) => set("uppercase", v)} />
         <Switch label="Pop in" checked={style.animation === "pop"} onChange={(v) => set("animation", v ? "pop" : "none")} />
@@ -77,9 +91,7 @@ export function StylePanel() {
         <Field label="Show">
           <Segmented label="Show" value={style.mode} options={MODES} onChange={(v) => set("mode", v)} />
         </Field>
-        <Field label="Position">
-          <Segmented label="Position" value={style.position} options={POSITIONS} onChange={(v) => set("position", v)} />
-        </Field>
+        <PositionFields style={style} />
         <SliderField
           label="Characters per line"
           value={style.max_chars_per_line}
@@ -97,6 +109,62 @@ export function StylePanel() {
         </Field>
       </section>
     </div>
+  );
+}
+
+const ANCHOR_HINT: Record<Position, string> = {
+  top: "X is the caption's centre, Y its top edge.",
+  middle: "X and Y are the caption's centre.",
+  bottom: "X is the caption's centre, Y its bottom edge.",
+};
+
+/**
+ * Top / Middle / Bottom presets (selected only while no free position is set), exact X / Y
+ * in percent of the frame, and the social safe-area overlay.
+ */
+function PositionFields({ style }: { style: Style }) {
+  const setStyle = useEditor((s) => s.setStyle);
+  const showSafeArea = useEditor((s) => s.showSafeArea);
+  const setShowSafeArea = useEditor((s) => s.setShowSafeArea);
+  const vertical = useEditor((s) => isVertical(s.videoSize));
+  const free = style.pos_x !== null || style.pos_y !== null;
+  const { x, y } = anchorPoint(style);
+  return (
+    <>
+      <Field label="Position" hint={`Drag the caption on the video to place it freely. ${ANCHOR_HINT[style.position]}`}>
+        <Segmented
+          label="Position"
+          value={free ? ("" as Position) : style.position}
+          options={POSITIONS}
+          onChange={(v) => setStyle({ position: v, pos_x: null, pos_y: null })}
+        />
+        <div className="position-xy">
+          <NumberField
+            label="X"
+            unit="%"
+            min={0}
+            max={100}
+            value={x * 100}
+            onChange={(v) => setStyle({ pos_x: v / 100, pos_y: y })}
+          />
+          <NumberField
+            label="Y"
+            unit="%"
+            min={0}
+            max={100}
+            value={y * 100}
+            onChange={(v) => setStyle({ pos_x: x, pos_y: v / 100, position: anchorForY(v / 100) })}
+          />
+        </div>
+      </Field>
+      <Switch
+        label="Show social safe area"
+        checked={showSafeArea && vertical}
+        disabled={!vertical}
+        onChange={setShowSafeArea}
+      />
+      {!vertical && <p className="style-hint">The safe area is for vertical (9:16) videos.</p>}
+    </>
   );
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { POP_MS, POP_SCALE, REFERENCE_HEIGHT, ghostFrame, outlineShadow, overlayFrame } from "../lib/overlay";
 import { Anchor, Guides, anchorPoint, dragAnchor, placement, playResX } from "../lib/position";
+import { SAFE_AREA, isVertical } from "../lib/safeArea";
 import { emPerFontSize, useFittedStyle } from "../lib/textMetrics";
 import { GripHorizontal, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { nextCaptionStart, previousCaptionStart } from "../lib/captions";
@@ -128,6 +129,7 @@ export function VideoPlayer({ path }: { path: string }) {
               )
             }
           />
+          <SafeAreaOverlay />
           <CaptionOverlay
             scale={frameHeight / REFERENCE_HEIGHT}
             frameWidth={frameWidth}
@@ -175,6 +177,28 @@ function PlayerControls({ playing, onTogglePlay }: { playing: boolean; onToggleP
         onClick={() => next !== null && seek(next)}
       />
       </div>
+    </div>
+  );
+}
+
+/**
+ * Shades what TikTok / Reels / Shorts cover on vertical videos, so captions can avoid it.
+ * Editor only: never exported.
+ */
+function SafeAreaOverlay() {
+  const show = useEditor((s) => s.showSafeArea && isVertical(s.videoSize));
+  if (!show) return null;
+  const pct = (v: number) => `${v * 100}%`;
+  return (
+    <div className="safe-area" aria-hidden>
+      <div className="safe-area-zone" style={{ top: 0, left: 0, right: 0, height: pct(SAFE_AREA.top) }} />
+      <div className="safe-area-zone" style={{ bottom: 0, left: 0, right: 0, height: pct(SAFE_AREA.bottom) }}>
+        <span>Covered by app captions and buttons</span>
+      </div>
+      <div
+        className="safe-area-zone"
+        style={{ top: pct(SAFE_AREA.top), bottom: pct(SAFE_AREA.bottom), right: 0, width: pct(SAFE_AREA.right) }}
+      />
     </div>
   );
 }

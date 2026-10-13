@@ -658,3 +658,34 @@
 .ui-toast-error svg {
   color: var(--color-danger);
 }
+
+/* Number field */
+
+.ui-number {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.ui-number-label {
+  position: absolute;
+  left: var(--space-3);
+  font: var(--text-meta);
+  color: var(--color-text-3);
+  pointer-events: none;
+}
+
+.ui-number .ui-input {
+  padding-left: 30px;
+  padding-right: 26px;
+  text-align: right;
+}
+
+.ui-number-unit {
+  position: absolute;
+  right: var(--space-3);
+  font: var(--text-meta);
+  color: var(--color-text-3);
+  pointer-events: none;
+}

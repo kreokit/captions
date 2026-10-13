@@ -108,3 +108,27 @@
   right: 0;
   height: 1px;
 }
+
+/* Social safe area (editor only) */
+
+.safe-area {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.safe-area-zone {
+  position: absolute;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 6px;
+  background: rgb(255 90 95 / 0.16);
+  outline: 1px solid rgb(255 90 95 / 0.55);
+  outline-offset: -1px;
+}
+
+.safe-area-zone span {
+  font: 500 10px/12px var(--font-ui);
+  color: rgb(255 255 255 / 0.75);
+}

@@ -88,6 +88,18 @@ describe("keeping captions inside the frame", () => {
     expect(fitAnchor(placed, { width: 5000, height: 60 }, 1920).x).toBe(0.5);
     expect(fittedStyle(placed, { width: 100, height: 60 }, 1920)).toMatchObject({ pos_x: 0.3, pos_y: 0.8 });
   });
+
+  it("shrinks text that is wider than the frame, keeping the outline", () => {
+    // 9:16 frame (608 wide): text 900 px wide at size 60 plus a 2 x 5 px outline.
+    const wide = { ...style, font_size: 60, outline_width: 5, position: "bottom" as const };
+    const fitted = fittedStyle(wide, { width: 910, height: 130 }, 608);
+    // (608 * 0.98 - 10) / 900 = 0.6509 → size floor(60 * 0.6509) = 39.
+    expect(fitted.font_size).toBe(39);
+    // Centred: the shrunk box (900 * 39/60 + 10 = 595) fits; anchor stays in the middle.
+    expect(fitted.pos_x).toBeCloseTo(0.5);
+    // Text that fits keeps its size.
+    expect(fittedStyle(wide, { width: 400, height: 130 }, 608).font_size).toBe(60);
+  });
 });
 
 describe("dragging a caption", () => {

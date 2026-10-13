@@ -110,10 +110,35 @@ export function fitAnchor(style: Style, extents: Extents, playRes: number): { x:
   return { x: px / playRes, y: py / REFERENCE_HEIGHT };
 }
 
-/** The style with its position fitted inside the frame: what preview and exports use. */
+/** Text may use this much of the frame's width / height before it is shrunk to fit. */
+export const FIT_LIMIT = 0.98;
+
+/**
+ * The style as preview and exports use it: if the largest caption is wider or taller than
+ * the frame, the font size shrinks just enough to fit (same line breaks, outline kept);
+ * then the position is moved inside the frame (fitAnchor).
+ */
 export function fittedStyle(style: Style, extents: Extents, playRes: number): Style {
-  const { x, y } = fitAnchor(style, extents, playRes);
-  return { ...style, pos_x: x, pos_y: y };
+  let fitted = style;
+  let ext = extents;
+  const outline = 2 * style.outline_width;
+  const textW = extents.width - outline;
+  const textH = extents.height - outline;
+  if (textW > 0 && textH > 0) {
+    const factor = Math.min(
+      1,
+      (playRes * FIT_LIMIT - outline) / textW,
+      (REFERENCE_HEIGHT * FIT_LIMIT - outline) / textH,
+    );
+    if (factor < 1) {
+      const font_size = Math.max(1, Math.floor(style.font_size * factor));
+      const scale = font_size / style.font_size;
+      fitted = { ...style, font_size };
+      ext = { width: textW * scale + outline, height: textH * scale + outline };
+    }
+  }
+  const { x, y } = fitAnchor(fitted, ext, playRes);
+  return { ...fitted, pos_x: x, pos_y: y };
 }
 
 /** An anchor in fractions of the frame, with the edge it marks. */

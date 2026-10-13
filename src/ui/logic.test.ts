@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   nextIndex,
   normalizeHex,
+  parseNumberField,
   placeAtPoint,
   placePopover,
   snapToStep,
@@ -85,5 +86,15 @@ describe("normalizeHex", () => {
     for (const bad of ["", "#12", "#12345", "#GGGGGG", "lime", "#1234567"]) {
       expect(normalizeHex(bad), bad).toBeNull();
     }
+  });
+});
+
+describe("parseNumberField", () => {
+  it("reads numbers with an optional % and comma decimals, clamped", () => {
+    expect(parseNumberField("12.5", 0, 100)).toBe(12.5);
+    expect(parseNumberField(" 12,54 % ", 0, 100)).toBe(12.5);
+    expect(parseNumberField("140", 0, 100)).toBe(100);
+    expect(parseNumberField("-3", 0, 100)).toBe(0);
+    expect(parseNumberField("abc", 0, 100)).toBeNull();
   });
 });

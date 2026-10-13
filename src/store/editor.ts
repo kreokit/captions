@@ -8,6 +8,7 @@ import {
 } from "../lib/captions";
 import { DEFAULT_STYLE } from "../lib/presets";
 import type { Transcript, WhisperModel } from "../lib/transcribe";
+import { loadShowSafeArea, saveShowSafeArea } from "../lib/safeArea";
 import type { Project, Segment, Style } from "../lib/types";
 
 export function projectFromTranscript(
@@ -44,6 +45,9 @@ interface EditorState {
   /** The inspector tab showing (the video shows a draggable ghost caption on Style). */
   inspectorTab: "captions" | "style";
   setInspectorTab(tab: "captions" | "style"): void;
+  /** Shade the parts of vertical videos covered by social apps' buttons (view setting). */
+  showSafeArea: boolean;
+  setShowSafeArea(show: boolean): void;
   /** The video's pixel size, once the player has loaded it. */
   videoSize: { width: number; height: number } | null;
   setVideoSize(size: { width: number; height: number }): void;
@@ -96,6 +100,11 @@ export const useEditor = create<EditorState>()((set, get) => {
     select: (selected) => set({ selected }),
     inspectorTab: "captions",
     setInspectorTab: (inspectorTab) => set({ inspectorTab }),
+    showSafeArea: loadShowSafeArea(),
+    setShowSafeArea: (showSafeArea) => {
+      saveShowSafeArea(showSafeArea);
+      set({ showSafeArea });
+    },
     videoSize: null,
     setVideoSize: (videoSize) => set({ videoSize }),
     durationMs: 0,
