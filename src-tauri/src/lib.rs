@@ -9,11 +9,11 @@ mod models;
 mod probe;
 mod project;
 mod recent;
+mod selftest;
 mod subtitles;
 mod transcribe;
 mod vad;
 mod waveform;
-#[cfg(test)]
 mod wer;
 
 use std::path::PathBuf;
@@ -385,6 +385,12 @@ fn dev_startup_project() -> Option<String> {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// The hidden `--self-test` mode for release CI (see `selftest.rs`). `args` excludes the
+/// program name; returns `None` when the app should start normally.
+pub fn self_test(args: &[String]) -> Option<std::process::ExitCode> {
+    selftest::run_if_requested(args)
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
