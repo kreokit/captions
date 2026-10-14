@@ -26,7 +26,7 @@ Target users: creators worldwide making Reels/TikTok/Shorts, plus NGOs and small
   - Language: auto-detect by default
   - Non-speech tags such as `[MUSIC]` or `(applause)` are hidden from captions by default
   - Enable token-level timestamps to get **word timings** for word-highlight styles
-  - CPU only in v0.1 (all platforms). Release builds use `GGML_NATIVE=OFF`; x86-64 needs AVX2/FMA/F16C, checked at startup (`src-tauri/src/cpu.rs`). GPU (Metal, CUDA/Vulkan) is in the backlog
+  - CPU only in v0.1 (all platforms). Release builds use `GGML_NATIVE=OFF`, and on macOS Accelerate's classic `cblas_sgemm` (see Release lessons); x86-64 needs AVX2/FMA/F16C, checked at startup (`src-tauri/src/cpu.rs`). GPU (Metal, CUDA/Vulkan) is in the backlog
 - **Media:** FFmpeg as a Tauri **sidecar** binary
   - Use an **LGPL** FFmpeg build, not GPL. That means no libx264. Encode with platform encoders: `h264_videotoolbox` (macOS), `h264_mf` (Windows), `libopenh264` (Linux, and Windows fallback); libx264 only in debug builds
   - Release sidecars: FFmpeg 9.0.2. BtbN LGPL builds (Windows/Linux), built from source in CI (macOS). Exact sources in `src-tauri/binaries/README.md`; `scripts/verify_ffmpeg.py` enforces LGPL + features
@@ -85,7 +85,7 @@ Copy these into a new app (same stack) instead of rebuilding them:
 - **App shell:** macOS overlay title bar (`src-tauri/tauri.macos.conf.json`, drag regions, `platform-mac`), top bar, Home drop zone + recent projects (`src-tauri/src/recent.rs`), unsupported-CPU dialog
 - **Fonts:** `src-tauri/resources/fonts` (OFL fonts + licence files) and `src/styles/caption-fonts.css`; same files for preview and FFmpeg/libass (`fontsdir`)
 - **FFmpeg sidecar setup:** `src-tauri/src/ffmpeg.rs` (locate dev/sidecar binaries), `scripts/fetch_ffmpeg.py`, `scripts/build-ffmpeg-macos.sh`, `scripts/verify_ffmpeg.py`, `src-tauri/binaries/README.md`, encoder allow-list + fallback in `src-tauri/src/burn.rs`
-- **Release workflow:** `.github/workflows/release.yml` (4-target matrix, draft pre-release, ad-hoc macOS signing, whisper CPU baseline), `tauri.release.conf.json`, release-notes template in `docs/release-notes/`
+- **Release workflow:** `.github/workflows/release.yml` (4-target matrix, draft pre-release, ad-hoc macOS signing, whisper CPU baseline, macOS binary check `scripts/check_macos_binary.py`, `--self-test`), `tauri.release.conf.json`, release-notes template in `docs/release-notes/`
 - **Licence checks:** `src-tauri/deny.toml` (cargo-deny), `scripts/third_party.py` + `scripts/third-party-header.md` → `THIRD-PARTY-LICENSES.md` (CI `--check`)
 - **Feedback:** `.github/ISSUE_TEMPLATE/` and the in-app "Report a problem" command
 
@@ -97,6 +97,12 @@ Copy these into a new app (same stack) instead of rebuilding them:
 - Line layout: `fixtures/layout-cases.json`, shared by the Rust and TypeScript implementations so preview and exports break lines identically
 - ASS generator: snapshot tests per style mode
 - Export: the burned-in MP4 has the same duration and resolution as the input (ffprobe)
+
+## Release lessons
+
+- **Release builds use a newer SDK than dev builds; weak imports can crash on older macOS.** CI builds with the runner's SDK (15.x); this Mac has SDK 13.1. A system function newer than the minimum macOS (12.0) is weak-imported and is NULL on older macOS, so calling it jumps to address 0 (`EXC_BAD_ACCESS`, `rip = 0`). 0.1.0 and 0.1.1 crashed on macOS 12 when transcribing this way: whisper.cpp's BLAS backend called Accelerate's `cblas_sgemm$NEWLAPACK$ILP64` (macOS 13.3+). Local builds never showed it, and neither can the macOS 15 runners. Fix: the macOS release builds set `CXXFLAGS=-UACCELERATE_NEW_LAPACK -UACCELERATE_LAPACK_ILP64`, so the classic `cblas_sgemm` (every macOS) is linked, as in dev builds. (`GGML_BLAS=OFF` doesn't link with whisper-rs-sys 0.15 and was 1.5× slower.) whisper-rs-sys doesn't rebuild when `GGML_*`/`CXXFLAGS` change, so change the rust-cache key with them. Guard: `scripts/check_macos_binary.py` (no weak imports, minimum macOS ≤ 12.0) runs on the app and its FFmpeg sidecars in the release workflow
+- **Test the shipped binary, not a dev build.** `captions --self-test <clip> [--reference <txt>] [--models <dir>]` (`src-tauri/src/selftest.rs`, hidden, starts no window) transcribes with the base model inside the release binary; the release workflow runs it on all four targets
+- Run the full test suite after a version bump
 
 ## Dev environments to support
 
