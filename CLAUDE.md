@@ -2,7 +2,7 @@
 
 Read this before every task. It is the source of truth for scope and architecture.
 
-**Status (2026-10-13):** Milestones 1–6 and the UI redesign are done. v0.1.1-alpha (free caption positioning) is published as a pre-release: <https://github.com/kreokit/captions/releases/tag/v0.1.1-alpha>. Next work comes from the backlog and tester feedback (issues).
+**Status (2026-10-15):** Milestones 1–6 and the UI redesign are done. v0.1.2-alpha (fixes the crash when transcribing on macOS 12–13.2; free caption positioning came in 0.1.1) is published as a pre-release: <https://github.com/kreokit/captions/releases/tag/v0.1.2-alpha>. Next work comes from the backlog and tester feedback (issues).
 
 ## What we are building
 
