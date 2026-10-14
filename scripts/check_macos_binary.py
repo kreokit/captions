@@ -6,7 +6,8 @@
 For every Mach-O file given (for an .app: everything in Contents/MacOS and
 Contents/Frameworks), fails unless:
 - its minimum macOS (LC_BUILD_VERSION / LC_VERSION_MIN_MACOSX `minos`) is at most --min-macos
-- it has no weak-imported symbols and no weakly linked libraries
+- it has no weak-imported symbols (except libc++'s operator new/delete and std exception
+  typeinfo, see ALLOWED_WEAK) and no weakly linked libraries
 
 Why: release builds use a newer SDK than dev builds. A system function that is newer than
 the minimum macOS gets weak-imported, and on an older macOS it resolves to NULL; calling it
@@ -20,6 +21,10 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+
+# libc++'s replaceable operator new/delete and the std exception typeinfo can show up as weak
+# imports (C++ lets programs replace them). Every macOS 12 libc++ has them.
+ALLOWED_WEAK = re.compile(r"__Z(nw|na|dl|da)\S* \(from libc\+\+\)|__ZTISt\S* \(from libc\+\+\)")
 
 MACHO_MAGICS = {
     bytes.fromhex(m)
@@ -72,7 +77,9 @@ def problems(binary: Path, min_macos: str) -> list[str]:
         found.append(f"weakly linked library {lib}")
     for line in run("nm", "-m", str(binary)).splitlines():
         if "(undefined) weak external" in line:
-            found.append("weak import " + line.split("weak external", 1)[1].strip())
+            symbol = line.split("weak external", 1)[1].strip()
+            if not ALLOWED_WEAK.fullmatch(symbol):
+                found.append("weak import " + symbol)
     return found
 
 
