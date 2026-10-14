@@ -201,3 +201,19 @@ jobs:
         run: |
           python scripts/check_macos_binary.py --min-macos "$MACOSX_DEPLOYMENT_TARGET" \
             src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app
+
+      - name: Cache the whisper base model
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/whisper-models
+          key: whisper-ggml-base-60ed5bc3
+      - name: Self-test the release binary (transcribe the English fixture)
+        run: |
+          out="src-tauri/target/${{ matrix.target }}/release"
+          case "${{ runner.os }}" in
+            macOS) exe=$(ls -d "$out"/bundle/macos/*.app)/Contents/MacOS/captions ;;
+            Windows) exe="$out/captions.exe" ;;
+            *) exe="$out/captions" ;;
+          esac
+          "$exe" --self-test fixtures/en/hello.mp4 --reference fixtures/en/hello.txt \
+            --models "${{ runner.temp }}/whisper-models"
