@@ -185,3 +185,11 @@ jobs:
                    "$bin/ffmpeg$exe" "$bin/ffprobe$exe"; do
             [[ -f "$f" ]] && echo "ok  $f" || { echo "missing $f"; exit 1; }
           done
+
+      # The runners have a new macOS, where everything runs; this catches what would only
+      # fail on macOS 12 (weak imports from a newer SDK, a too-new minimum macOS).
+      - name: Check the macOS binaries run on macOS 12
+        if: runner.os == 'macOS'
+        run: |
+          python scripts/check_macos_binary.py --min-macos "$MACOSX_DEPLOYMENT_TARGET" \
+            src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app
