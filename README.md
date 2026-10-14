@@ -10,15 +10,15 @@ Part of [KreoKit](https://github.com/kreokit), free open-source creator tools.
 
 ## Download
 
-**[Get the latest version from Releases →](https://github.com/kreokit/captions/releases)** (currently [v0.1.1-alpha](https://github.com/kreokit/captions/releases/tag/v0.1.1-alpha), an early test version)
+**[Get the latest version from Releases →](https://github.com/kreokit/captions/releases)** (currently [v0.1.2-alpha](https://github.com/kreokit/captions/releases/tag/v0.1.2-alpha), an early test version)
 
 | Your computer | Download |
 |---|---|
-| Mac with Apple Silicon (M1, M2, M3, M4…) | [KreoKit.Captions_0.1.1_aarch64.dmg](https://github.com/kreokit/captions/releases/download/v0.1.1-alpha/KreoKit.Captions_0.1.1_aarch64.dmg) |
-| Mac with Intel processor | [KreoKit.Captions_0.1.1_x64.dmg](https://github.com/kreokit/captions/releases/download/v0.1.1-alpha/KreoKit.Captions_0.1.1_x64.dmg) |
-| Windows 10 / 11 | [KreoKit.Captions_0.1.1_x64-setup.exe](https://github.com/kreokit/captions/releases/download/v0.1.1-alpha/KreoKit.Captions_0.1.1_x64-setup.exe) |
-| Linux (any distribution) | [KreoKit.Captions_0.1.1_amd64.AppImage](https://github.com/kreokit/captions/releases/download/v0.1.1-alpha/KreoKit.Captions_0.1.1_amd64.AppImage) |
-| Linux (Debian / Ubuntu) | [KreoKit.Captions_0.1.1_amd64.deb](https://github.com/kreokit/captions/releases/download/v0.1.1-alpha/KreoKit.Captions_0.1.1_amd64.deb) |
+| Mac with Apple Silicon (M1, M2, M3, M4…) | [KreoKit.Captions_0.1.2_aarch64.dmg](https://github.com/kreokit/captions/releases/download/v0.1.2-alpha/KreoKit.Captions_0.1.2_aarch64.dmg) |
+| Mac with Intel processor | [KreoKit.Captions_0.1.2_x64.dmg](https://github.com/kreokit/captions/releases/download/v0.1.2-alpha/KreoKit.Captions_0.1.2_x64.dmg) |
+| Windows 10 / 11 | [KreoKit.Captions_0.1.2_x64-setup.exe](https://github.com/kreokit/captions/releases/download/v0.1.2-alpha/KreoKit.Captions_0.1.2_x64-setup.exe) |
+| Linux (any distribution) | [KreoKit.Captions_0.1.2_amd64.AppImage](https://github.com/kreokit/captions/releases/download/v0.1.2-alpha/KreoKit.Captions_0.1.2_amd64.AppImage) |
+| Linux (Debian / Ubuntu) | [KreoKit.Captions_0.1.2_amd64.deb](https://github.com/kreokit/captions/releases/download/v0.1.2-alpha/KreoKit.Captions_0.1.2_amd64.deb) |
 
 Not sure which Mac you have? Apple menu → **About This Mac**: "Chip: Apple M…" means Apple Silicon, "Processor: Intel…" means Intel.
 
