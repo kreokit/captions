@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "KreoKit Captions",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "identifier": "com.kreokit.captions",
   "build": {
     "beforeDevCommand": "pnpm dev",

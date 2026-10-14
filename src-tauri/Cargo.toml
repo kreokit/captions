@@ -1,6 +1,6 @@
 [package]
 name = "captions"
-version = "0.1.1"
+version = "0.1.2"
 description = "Free, offline auto-captions for your videos. Part of KreoKit."
 authors = ["KreoKit contributors"]
 license = "MIT OR Apache-2.0"
