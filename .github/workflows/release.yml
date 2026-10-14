@@ -114,6 +114,13 @@ jobs:
       GGML_AVX2: ${{ contains(matrix.target, 'x86_64') && 'ON' || 'OFF' }}
       GGML_FMA: ${{ contains(matrix.target, 'x86_64') && 'ON' || 'OFF' }}
       GGML_F16C: ${{ contains(matrix.target, 'x86_64') && 'ON' || 'OFF' }}
+      # macOS: whisper.cpp defines ACCELERATE_NEW_LAPACK, so with the runners' SDK it calls
+      # Accelerate's cblas_sgemm$NEWLAPACK$ILP64 (macOS 13.3+). That is weak-imported and NULL
+      # on macOS 12, so transcribing crashed there (0.1.0, 0.1.1). Undefining it (our flags
+      # come after CMake's defines) gives the classic cblas_sgemm from every macOS, as in dev
+      # builds. GGML_BLAS=OFF instead doesn't link (whisper-rs-sys always links ggml-blas on
+      # macOS) and was 1.5x slower. scripts/check_macos_binary.py verifies the result.
+      CXXFLAGS: ${{ contains(matrix.target, 'apple') && '-UACCELERATE_NEW_LAPACK -UACCELERATE_LAPACK_ILP64' || '' }}
       MACOSX_DEPLOYMENT_TARGET: "12.0"
     defaults:
       run:
@@ -136,7 +143,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-          key: ${{ matrix.target }}
+          # whisper-rs-sys doesn't rebuild when GGML_* or CXXFLAGS change; change the key then.
+          key: ${{ matrix.target }}-accelerate-classic
 
       - name: Linux packages for Tauri
         if: runner.os == 'Linux'
