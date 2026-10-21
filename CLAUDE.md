@@ -104,6 +104,10 @@ Copy these into a new app (same stack) instead of rebuilding them:
 - **Test the shipped binary, not a dev build.** `captions --self-test <clip> [--reference <txt>] [--models <dir>]` (`src-tauri/src/selftest.rs`, hidden, starts no window) transcribes with the base model inside the release binary; the release workflow runs it on all four targets
 - Run the full test suite after a version bump
 
+## Release checklist
+
+- After publishing, update the kreokit/.github profile README row.
+
 ## Dev environments to support
 
 - macOS 12 Monterey (Intel or Apple Silicon): check Tauri 2 / WebView compatibility early
