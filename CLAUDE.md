@@ -107,6 +107,7 @@ Copy these into a new app (same stack) instead of rebuilding them:
 ## Release checklist
 
 - After publishing, update the kreokit/.github profile README row.
+- After publishing, update the tag and file names in kreokit/website data/apps.json.
 
 ## Dev environments to support
 
