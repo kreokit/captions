@@ -8,6 +8,8 @@
 
 Part of [KreoKit](https://github.com/kreokit), free open-source creator tools.
 
+🌐 **Website: [kreokit.vercel.app/captions](https://kreokit.vercel.app/captions)**: download for your computer and see how to install it.
+
 ## Download
 
 **[Get the latest version from Releases →](https://github.com/kreokit/captions/releases)** (currently [v0.1.2-alpha](https://github.com/kreokit/captions/releases/tag/v0.1.2-alpha), an early test version)
